@@ -13,8 +13,8 @@ DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
  
-const int AirValue = 620;   //you need to replace this value with Value_1
-const int WaterValue = 310;  //you need to replace this value with Value_2
+const int AirValue = 615;   //you need to replace this value with Value_1
+const int WaterValue = 249;  //you need to replace this value with Value_2
 int soilMoistureValue = 0;
 int soilmoisturepercent=0;
 void setup() {
