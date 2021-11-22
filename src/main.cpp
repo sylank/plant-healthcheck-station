@@ -56,7 +56,7 @@ void displayStationScreens(String wifiStatus, String lastPackageStatus, String s
 {
   displayUtils.clear();
   displayUtils.addText(0, 0, "WiFi: " + wifiStatus);
-  displayUtils.addText(0, 10, "Pkg.: " + lastPackageStatus);
+  displayUtils.addText(0, 10, "Last pkg.: " + lastPackageStatus);
   displayUtils.print();
 
   delay(3000);
@@ -91,47 +91,55 @@ void setup()
 #endif
 }
 
+unsigned long startTime = millis();
+bool pkgStatus = false;
+int soilmoisturepercent = 0;
+float hum;
+float temp;
+
 void loop()
 {
-  int soilMoistureValue = analogRead(A0);
-  int soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
-  float hum = dht.readHumidity();
-  float temp = dht.readTemperature();
-
-  if (soilmoisturepercent >= 100)
+  if ((millis() - startTime) > 600000) // 10 minutes sleep
   {
-    soilmoisturepercent = 100;
-  }
+    startTime = millis();
+    int soilMoistureValue = analogRead(A0);
+    soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
+    hum = dht.readHumidity();
+    temp = dht.readTemperature();
 
-  if (soilmoisturepercent <= 0)
-  {
-    soilmoisturepercent = 0;
-  }
+    if (soilmoisturepercent >= 100)
+    {
+      soilmoisturepercent = 100;
+    }
+
+    if (soilmoisturepercent <= 0)
+    {
+      soilmoisturepercent = 0;
+    }
 
 #ifdef DEBUG
-  serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
+    serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
 #endif
 
-  bool connected = wifi.isConnected();
-  bool pkgStatus = false;
-  if (connected)
-  {
-    wifi.connectToTCPServer("192.168.88.207", "3333");
-    wifi.sendData("aa-1;0;1.1;2.2;3.11");
-    pkgStatus = wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
-    // wifi.closeConnection();
-  }
-  else
-  {
-    connected = connectToWifi();
+    bool connected = wifi.isConnected();
+    if (connected)
+    {
+      wifi.connectToTCPServer("192.168.88.207", "3333");
+      wifi.sendData("aa-1;0;1.1;2.2;3.11");
+      pkgStatus = wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
+      // wifi.closeConnection();
+    }
+    else
+    {
+      connected = connectToWifi();
+    }
   }
 
-  displayStationScreens(connected ? "connected" : "disconnected",
+  displayStationScreens(wifi.isConnected() ? "connected" : "disconnected",
                         pkgStatus ? "OK" : "ERR",
                         String(soilmoisturepercent),
                         String(hum),
                         String(temp));
 
   // delay(600000); // 10 minutes
-  delay(3000); // 10 minutes
 }
