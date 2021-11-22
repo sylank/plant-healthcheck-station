@@ -15,6 +15,8 @@
 #include "Wifi.h"
 
 //Constants
+#define DEBUG true
+
 #define DHTPIN 7      // what pin we're connected to
 #define DHTTYPE DHT22 // DHT 22  (AM2302)
 
@@ -31,27 +33,68 @@ Display displayUtils(&adisplay);
 SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
 Wifi wifi(&aserial);
 
-const int AirValue = 615;   //you need to replace this value with Value_1
-const int WaterValue = 249; //you need to replace this value with Value_2
+#define AIR_VALUE 615   //you need to replace this value with Value_1
+#define WATER_VALUE 249 //you need to replace this value with Value_2
+
+void serialPrintln(String text)
+{
+#ifdef DEBUG
+  Serial.println(text);
+#endif
+}
+
+bool connectToWifi()
+{
+  wifi.setupClientMode();
+  wifi.turnOffEchoMode();
+  wifi.connectToWifiAP("szentkuti_serleg_2ghz", "Jeromos210523");
+
+  return wifi.isConnected();
+}
+
+void displayStationScreens(String wifiStatus, String lastPackageStatus, String soilmoisturepercent, String hum, String temp)
+{
+  displayUtils.clear();
+  displayUtils.addText(0, 0, "WiFi: " + wifiStatus);
+  displayUtils.addText(0, 10, "Pkg.: " + lastPackageStatus);
+  displayUtils.print();
+
+  delay(3000);
+  displayUtils.clear();
+
+  displayUtils.addText(0, 0, "Soil: " + soilmoisturepercent + " %");
+  displayUtils.addText(0, 10, "Hum: " + hum + " %");
+  displayUtils.addText(0, 20, "Temp: " + temp + " C");
+  displayUtils.print();
+}
 
 void setup()
 {
+#ifdef DEBUG
   Serial.begin(9600);
+#endif
 
   dht.begin();
   wifi.begin();
   displayUtils.begin();
 
+  connectToWifi();
+
+#ifndef DEBUG
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
+#endif
 
-  Serial.println("Setup completed...");
+#ifdef DEBUG
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);
+#endif
 }
 
 void loop()
 {
   int soilMoistureValue = analogRead(A0);
-  int soilmoisturepercent = map(soilMoistureValue, AirValue, WaterValue, 0, 100);
+  int soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
   float hum = dht.readHumidity();
   float temp = dht.readTemperature();
 
@@ -65,43 +108,30 @@ void loop()
     soilmoisturepercent = 0;
   }
 
-  Serial.println("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
+#ifdef DEBUG
+  serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
+#endif
 
-  wifi.connectToTCPServer("192.168.88.207", "3333");
-  wifi.sendData("aa-1;0;1.1;2.2;3.11");
-  wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
-  wifi.closeConnection();
+  bool connected = wifi.isConnected();
+  bool pkgStatus = false;
+  if (connected)
+  {
+    wifi.connectToTCPServer("192.168.88.207", "3333");
+    wifi.sendData("aa-1;0;1.1;2.2;3.11");
+    pkgStatus = wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
+    // wifi.closeConnection();
+  }
+  else
+  {
+    connected = connectToWifi();
+  }
 
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "WiFi status");
-  displayUtils.addText(0, 10, "unknown");
-  displayUtils.print();
+  displayStationScreens(connected ? "connected" : "disconnected",
+                        pkgStatus ? "OK" : "ERR",
+                        String(soilmoisturepercent),
+                        String(hum),
+                        String(temp));
 
-  delay(3000);
-  displayUtils.clear();
-
-  displayUtils.addText(0, 0, "Soil moisture: " + String(soilmoisturepercent) + " %");
-  displayUtils.addText(0, 10, "Humidity: " + String(hum) + " %");
-  displayUtils.addText(0, 20, "Temperature: " + String(temp) + " C");
-  displayUtils.print();
-
-  delay(600000); // 10 minutes
+  // delay(600000); // 10 minutes
+  delay(3000); // 10 minutes
 }
-
-//AT+UART_DEF=9600, 8, 1, 0, 0
-
-//AT+CWMODE=1 client mode
-
-//AT+CWLAP list wifi
-
-//AT+CWJAP="Liberty Media", "nlj-hyiyk187" connect
-
-//AT+CIFSR get IP
-
-//AT+CIPSTART="TCP","192.168.88.207",3333 connect to tcp
-
-//AT+CIPSEND=19 send n bytes
-
-//aa-1;0;1.1;2.2;3.11
-
-//AT+CIPCLOSE

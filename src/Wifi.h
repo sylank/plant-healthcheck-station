@@ -11,23 +11,27 @@ class Wifi
 {
 private:
     SoftwareSerial *serial;
-    String writeToESPModule(String data);
-    String writeToESPModule2(String data);
+    bool writeToESPModule(String data);
+    bool writeToESPModule2(String data);
+    bool waitForResponse(String target, unsigned long timeout);
 
 public:
     Wifi(SoftwareSerial *serial);
     void begin();
 
-    String pingModule();
-    String setupBaudRateOnModule();
-    String clientMode();
-    String listWifiAPs();
-    String connectToWifiAP(String name, String pwd);
-    String connectToTCPServer(String host, String port);
-    String sendData(String data);
-    String sendData2(String data);
-    String recvWithEndMarker();
-    String closeConnection();
+    bool pingModule();
+    bool setupBaudRateOnModule();
+    bool connectToWifiAP(String name, String pwd);
+    bool connectToTCPServer(String host, String port);
+    bool sendData(String data);  // calculate
+    bool sendData2(String data); // send
+    bool closeConnection();
+
+    bool setupWifiCard();
+    bool setupClientMode();
+    void turnOffEchoMode();
+
+    bool isConnected();
 
     ~Wifi();
 };
