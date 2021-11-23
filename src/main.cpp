@@ -52,11 +52,11 @@ bool connectToWifi()
   return wifi.isConnected();
 }
 
-void displayStationScreens(String wifiStatus, String lastPackageStatus, String soilmoisturepercent, String hum, String temp)
+void displayStationScreens(bool wifiStatus, bool lastPackageStatus, String soilmoisturepercent, String hum, String temp)
 {
   displayUtils.clear();
-  displayUtils.addText(0, 0, "WiFi: " + wifiStatus);
-  displayUtils.addText(0, 10, "Last pkg.: " + lastPackageStatus);
+  displayUtils.addText(0, 0, "WiFi: " + wifiStatus ? "connected" : "disconnected");
+  displayUtils.addText(0, 10, "Last pkg.: " + lastPackageStatus ? "OK" : "ERR");
   displayUtils.print();
 
   delay(3000);
@@ -96,6 +96,7 @@ bool pkgStatus = false;
 int soilmoisturepercent = 0;
 float hum;
 float temp;
+bool connected;
 
 void loop()
 {
@@ -121,7 +122,7 @@ void loop()
     serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
 #endif
 
-    bool connected = wifi.isConnected();
+    connected = wifi.isConnected();
     if (connected)
     {
       wifi.connectToTCPServer("192.168.88.207", "3333");
@@ -135,8 +136,8 @@ void loop()
     }
   }
 
-  displayStationScreens(wifi.isConnected() ? "connected" : "disconnected",
-                        pkgStatus ? "OK" : "ERR",
+  displayStationScreens(connected,
+                        pkgStatus,
                         String(soilmoisturepercent),
                         String(hum),
                         String(temp));
