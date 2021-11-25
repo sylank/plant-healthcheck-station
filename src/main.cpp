@@ -30,11 +30,11 @@ int screenStatus = 0;
 unsigned long startTime = millis();
 bool pkgStatus = false;
 int soilmoisturepercent = 0;
-float hum; // use int ?
-float temp;
-bool connected;
-bool resetBtnPrestate;
-bool screenBtnPrestate;
+float hum = 0; // use int ?
+float temp = 0;
+bool connected = false;
+bool resetBtnPrestate = false;
+bool screenBtnPrestate = false;
 
 void serialPrintln(String text)
 {
@@ -94,24 +94,18 @@ void displayStationScreens(bool wifiStatus, bool lastPackageStatus, String soilm
   {
   case 0:
     displaySensorScreen(soilmoisturepercent, hum, temp);
-    delay(3000);
-    displayNetworScreen(wifiStatus, lastPackageStatus);
-    delay(3000);
     break;
   case 1:
     displayNetworScreen(wifiStatus, lastPackageStatus);
     break;
-  case 2:
-    displaySensorScreen(soilmoisturepercent, hum, temp);
-    break;
-  case 3: // OFF
+  case 2: // OFF
     displayUtils.clear();
     displayUtils.print();
     break;
-  case 4:
+  case 3:
     displayInstantScreen();
     break;
-  case 5:
+  case 4:
     displayResetScreen();
     break;
   }
@@ -138,7 +132,7 @@ void handleButtons()
   if (checkButton(RESET_BUTTON_PIN, resetBtnPrestate))
   {
     resetBtnPrestate = true;
-    screenStatus = 4;
+    screenStatus = 3;
   }
   else
   {
@@ -149,14 +143,14 @@ void handleButtons()
   {
     screenStatus++;
 
-    if (screenStatus > 3)
+    if (screenStatus > 2)
     {
       screenStatus = 0;
     }
 
     if (resetBtnPrestate)
     {
-      screenStatus = 5;
+      screenStatus = 4;
     }
 
     screenBtnPrestate = true;
