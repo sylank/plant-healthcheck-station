@@ -13,7 +13,8 @@ private:
     SoftwareSerial *serial;
     bool writeToESPModule(String data);
     bool writeToESPModule2(String data);
-    bool waitForResponse(String target, unsigned long timeout);
+    bool waitForStatusResponse(String target, unsigned long timeout);
+    String waitForStringResponse(unsigned long timeout);
 
 public:
     Wifi(SoftwareSerial *serial);
@@ -27,11 +28,18 @@ public:
     bool sendData2(String data); // send
     bool closeConnection();
 
+    bool setupWiFiAP();
+    bool setupTcpServer();
+    void resetWifiModule();
+    void serialClear();
+
     bool setupWifiCard();
     bool setupClientMode();
     void turnOffEchoMode();
 
     bool isConnected();
+
+    String readMessageFromServer();
 
     ~Wifi();
 };

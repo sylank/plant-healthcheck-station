@@ -50,7 +50,7 @@ bool Wifi::writeToESPModule(String data)
     String command = data + "\r\n";
     serial->write(command.c_str());
 
-    return waitForResponse("OK\r\n\0", 5000L);
+    return waitForStatusResponse("OK\r\n\0", 5000L);
 }
 
 bool Wifi::writeToESPModule2(String data)
@@ -58,10 +58,10 @@ bool Wifi::writeToESPModule2(String data)
     String command = data + "\n";
     serial->write(command.c_str());
 
-    return waitForResponse("OK\r\n\0", 5000L);
+    return waitForStatusResponse("OK\r\n\0", 5000L);
 }
 
-bool Wifi::waitForResponse(String target, unsigned long timeout)
+bool Wifi::waitForStatusResponse(String target, unsigned long timeout)
 {
     unsigned long startTime = millis();
     String responseBuffer;
@@ -103,12 +103,85 @@ bool Wifi::isConnected()
     String command = "AT+CIFSR\r\n";
     serial->write(command.c_str());
 
-    return !waitForResponse("0.0.0.0\"\r\n\0", 5000L);
+    return !waitForStatusResponse("0.0.0.0\"\r\n\0", 5000L);
 }
 
 void Wifi::turnOffEchoMode()
 {
     writeToESPModule("ATE0");
+}
+
+bool Wifi::setupWiFiAP()
+{
+    writeToESPModule("AT+CWMODE=2");
+    return writeToESPModule("AT+CWSAP_CUR=\"ps\",\"1\",5,3");
+}
+
+bool Wifi::setupTcpServer()
+{
+    writeToESPModule("AT+CIPMUX=1");
+    return writeToESPModule("AT+CIPSERVER=1,1001");
+}
+
+String Wifi::readMessageFromServer()
+{
+    if (serial->available())
+    {
+        String msg = waitForStringResponse(3000);
+        if (msg.indexOf(':') != -1)
+        {
+            return msg.substring(msg.indexOf(':') + 1, msg.length());
+        }
+
+        return msg;
+    }
+
+    return "";
+}
+
+String Wifi::waitForStringResponse(unsigned long timeout)
+{
+    String responseBuffer;
+    unsigned long startTime = millis();
+
+    char charIn;
+
+    while ((millis() - startTime) < timeout)
+    {
+        if (serial->available())
+        {
+            charIn = serial->read();
+            responseBuffer += charIn;
+        }
+        if (responseBuffer.endsWith("\r\n\0"))
+        {
+            Serial.println("res:" + responseBuffer);
+            return responseBuffer;
+        }
+    }
+    if (!responseBuffer.endsWith("\r\n\0"))
+    {
+        Serial.println(responseBuffer);
+        return "";
+    }
+
+    return "";
+}
+
+void Wifi::resetWifiModule()
+{
+    writeToESPModule("AT+RESTORE");
+}
+
+void Wifi::serialClear()
+{
+    if (serial->available())
+    {
+        while (serial->available())
+        {
+            serial->read();
+        }
+    }
 }
 
 Wifi::~Wifi()
