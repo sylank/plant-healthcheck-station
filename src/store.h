@@ -9,4 +9,7 @@ struct Store
 
     String ssid = "";
     String pwd = "";
+
+    // String sensorGateAddress = "192.168.88.207";
+    // String sensorGatePort = "3333";
 };

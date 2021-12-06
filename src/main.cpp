@@ -164,6 +164,12 @@ void readWifiConfiguration()
     store.pwd = pwd;
 
     eepromUtils.saveData(store);
+
+    wifi.resetWifiModule();
+    delay(5000);
+    wifi.serialClear();
+
+    connectToWifi();
   }
 }
 
