@@ -179,7 +179,6 @@ void exitFromResetState()
   {
     Store store = eepromUtils.readData();
     store.resetState = false;
-    store.wifiConfigured = false;
 
     eepromUtils.saveData(store);
   }
@@ -232,11 +231,14 @@ void initEEPROM()
 #ifdef DEBUG
   serialPrintln("EEPROM present");
   serialPrintln(eepromUtils.isPresent() ? "true" : "false");
-  Store data = eepromUtils.readData();
   serialPrintln("wifiConfigured");
-  serialPrintln(data.wifiConfigured ? "true" : "false");
+  serialPrintln(eepromUtils.readData().wifiConfigured ? "true" : "false");
   serialPrintln("resetState");
-  serialPrintln(data.resetState ? "true" : "false");
+  serialPrintln(eepromUtils.readData().resetState ? "true" : "false");
+  serialPrintln("wifiConfigured");
+  serialPrintln(String(eepromUtils.readData().airValue));
+  serialPrintln("resetState");
+  serialPrintln(String(eepromUtils.readData().waterValue));
 #endif
   if (!eepromUtils.isPresent())
   {
@@ -327,11 +329,11 @@ void loop()
                         String(soilmoisturepercent),
                         String(hum),
                         String(temperature));
-#ifdef DEBUG
-  serialPrintln("asdasd2");
-#endif
+
   if (eepromUtils.readData().resetState && !eepromUtils.readData().wifiConfigured)
   {
     readWifiConfiguration();
   }
+
+  delay(500);
 }

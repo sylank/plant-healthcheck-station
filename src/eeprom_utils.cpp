@@ -14,7 +14,7 @@ bool EepromUtils::isPresent()
 
 void EepromUtils::saveData(Store store)
 {
-    EEPROM.put(0, store);
+    EEPROM.put(DATA_ADDRESS, store);
     read = true;
 }
 
