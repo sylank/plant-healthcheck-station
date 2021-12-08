@@ -7,7 +7,7 @@ Wifi::Wifi(SoftwareSerial *serial)
 
 void Wifi::begin()
 {
-    serial->begin(9600);
+    serial->begin(BAUD_RATE);
 }
 
 bool Wifi::pingModule()

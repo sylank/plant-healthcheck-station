@@ -1,7 +1,10 @@
 #include "eeprom_utils.h"
 
+#include <EEPROM.h>
+
 EepromUtils::EepromUtils(/* args */)
 {
+    read = true;
 }
 
 bool EepromUtils::isPresent()
@@ -12,12 +15,21 @@ bool EepromUtils::isPresent()
 void EepromUtils::saveData(Store store)
 {
     EEPROM.put(0, store);
+    read = true;
 }
 
 Store EepromUtils::readData()
 {
-    Store val; //Variable tso store custom object read from EEPROM.
-    return EEPROM.get(DATA_ADDRESS, val);
+    if (read)
+    {
+        read = false;
+        Store val; //Variable tso store custom object read from EEPROM.
+        Store tmp = EEPROM.get(DATA_ADDRESS, val);
+
+        stored = tmp;
+    }
+
+    return stored;
 }
 
 void EepromUtils::clearEEPROM()
@@ -26,6 +38,8 @@ void EepromUtils::clearEEPROM()
     {
         EEPROM.write(i, CLEAR_BIT);
     }
+
+    read = true;
 }
 
 EepromUtils::~EepromUtils()

@@ -229,6 +229,15 @@ void handleButtons()
 
 void initEEPROM()
 {
+#ifdef DEBUG
+  serialPrintln("EEPROM present");
+  serialPrintln(eepromUtils.isPresent() ? "true" : "false");
+  Store data = eepromUtils.readData();
+  serialPrintln("wifiConfigured");
+  serialPrintln(data.wifiConfigured ? "true" : "false");
+  serialPrintln("resetState");
+  serialPrintln(data.resetState ? "true" : "false");
+#endif
   if (!eepromUtils.isPresent())
   {
     eepromUtils.clearEEPROM();
@@ -240,7 +249,7 @@ void initEEPROM()
 void setup()
 {
 #ifdef DEBUG
-  Serial.begin(9600);
+  Serial.begin(BAUD_RATE);
 #endif
 
   dht.begin();
@@ -318,7 +327,9 @@ void loop()
                         String(soilmoisturepercent),
                         String(hum),
                         String(temperature));
-
+#ifdef DEBUG
+  serialPrintln("asdasd2");
+#endif
   if (eepromUtils.readData().resetState && !eepromUtils.readData().wifiConfigured)
   {
     readWifiConfiguration();

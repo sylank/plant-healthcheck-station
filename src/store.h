@@ -3,7 +3,7 @@
 struct Store
 {
     bool wifiConfigured = false;
-    bool resetState = true;
+    bool resetState = false;
     int airValue = 615;
     int waterValue = 249;
 

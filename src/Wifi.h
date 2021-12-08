@@ -6,6 +6,7 @@
 #endif
 
 #include <Arduino.h>
+#include "define_utils.h"
 
 class Wifi
 {
