@@ -22,7 +22,7 @@ bool Wifi::setupBaudRateOnModule()
 
 bool Wifi::connectToWifiAP(String name, String pwd)
 {
-    return writeToESPModule("AT+CWJAP=\"" + name + "\", \"" + pwd + "\"");
+    return writeToESPModule("AT+CWJAP=\"" + name + "\",\"" + pwd + "\"");
 }
 
 bool Wifi::connectToTCPServer(String host, String port)
