@@ -11,7 +11,7 @@
 
 // Buttons
 #define SCREEN_BUTTON_PIN 8
-#define RESET_BUTTON_PIN 9
+#define INSTANT_BUTTON_PIN 9
 
 // Soil moisture
 #define AIR_VALUE 615   //you need to replace this value with Value_1

@@ -33,7 +33,7 @@ int soilmoisturepercent = 0;
 float hum = 0; // use int ?
 float temp = 0;
 bool connected = false;
-bool resetBtnPrestate = false;
+bool instantBtnPrestate = false;
 bool screenBtnPrestate = false;
 
 void serialPrintln(String text)
@@ -129,14 +129,14 @@ bool checkButton(int pinNumber, bool prestate)
 
 void handleButtons()
 {
-  if (checkButton(RESET_BUTTON_PIN, resetBtnPrestate))
+  if (checkButton(INSTANT_BUTTON_PIN, instantBtnPrestate))
   {
-    resetBtnPrestate = true;
+    instantBtnPrestate = true;
     screenStatus = 3;
   }
   else
   {
-    resetBtnPrestate = false;
+    instantBtnPrestate = false;
   }
 
   if (checkButton(SCREEN_BUTTON_PIN, screenBtnPrestate))
@@ -148,7 +148,7 @@ void handleButtons()
       screenStatus = 0;
     }
 
-    if (resetBtnPrestate)
+    if (instantBtnPrestate)
     {
       screenStatus = 4;
     }
@@ -164,7 +164,7 @@ void handleButtons()
 void setup()
 {
 #ifdef DEBUG
-  Serial.begin(9600);
+  Serial.begin(115200);
 #endif
 
   dht.begin();
@@ -173,7 +173,7 @@ void setup()
 
   connectToWifi();
 
-  pinMode(RESET_BUTTON_PIN, INPUT);
+  pinMode(INSTANT_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
 
 #ifndef DEBUG
@@ -189,7 +189,7 @@ void setup()
 
 void loop()
 {
-  if (((millis() - startTime) > 600000) || resetBtnPrestate == true) // 10 minutes
+  if (((millis() - startTime) > 600000) || instantBtnPrestate == true) // 10 minutes
   {
     startTime = millis();
     int soilMoistureValue = analogRead(A0);

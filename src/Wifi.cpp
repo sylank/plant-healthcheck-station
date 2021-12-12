@@ -7,7 +7,7 @@ Wifi::Wifi(SoftwareSerial *serial)
 
 void Wifi::begin()
 {
-    serial->begin(9600);
+    serial->begin(115200);
 }
 
 bool Wifi::pingModule()
@@ -17,7 +17,7 @@ bool Wifi::pingModule()
 
 bool Wifi::setupBaudRateOnModule()
 {
-    return writeToESPModule("AT+UART_DEF=9600,8,1,0,0");
+    return writeToESPModule("AT+UART_DEF=115200,8,1,0,0");
 }
 
 bool Wifi::connectToWifiAP(String name, String pwd)
@@ -90,7 +90,7 @@ bool Wifi::waitForResponse(String target, unsigned long timeout)
 
 bool Wifi::setupWifiCard()
 {
-    return writeToESPModule("AT+UART_DEF=9600,8,1,0,0");
+    return writeToESPModule("AT+UART_DEF=115200,8,1,0,0");
 }
 
 bool Wifi::setupClientMode()
