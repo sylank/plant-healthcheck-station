@@ -1,38 +1,60 @@
-#include <Wire.h>
+#include <DHT.h>
+#ifndef EEPROMSTORE_H
+#define EEPROMSTORE_H
+#include "EEPROMStore.h"
+#endif
 
 #ifndef DISPLAY_H
 #define DISPLAY_H
-#include <Adafruit_GFX.h>
+#include "display.h"
+#endif
+
+#ifndef ADASSD_H
+#define ADASSD_H
 #include <Adafruit_SSD1306.h>
 #endif
-#include <DHT.h>
-#ifndef WIFI_H
-#define WIFI_H
+
+#ifndef SOFTWARE_SERIAL_H
+#define SOFTWARE_SERIAL_H
 #include <SoftwareSerial.h>
 #endif
 
-#include "Display.h"
+#ifndef WIFI_H
+#define WIFI_H
 #include "Wifi.h"
+#endif
 
 #include "define_sensors.h"
 #include "define_utils.h"
 
-DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
+#ifndef STATIONEVENTHANDLER_H
+#define STATIONEVENTHANDLER_H
+#include "station_event_handler.h"
+#endif
+
+#ifndef MEASUREMENTVALUES_H
+#define MEASUREMENTVALUES_H
+#include "measurement_values.h"
+#endif
+
+#ifndef PERSISTENT_STATE_H
+#define PERSISTENT_STATE_H
+#include "persistent_state.h"
+#endif
+
+DHT dht(DHTPIN, DHTTYPE);
 
 Adafruit_SSD1306 adisplay(OLED_RESET);
-Display displayUtils(&adisplay);
+Display display(&adisplay);
 
 SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
 Wifi wifi(&aserial);
 
-int screenStatus = 0;
+EEPROMStore<PersistentState> persistentState;
+MeasurementValues *measurementValues;
+StationEventHandler *stationEventHandler;
 
 unsigned long startTime = millis();
-bool pkgStatus = false;
-int soilmoisturepercent = 0;
-float hum = 0; // use int ?
-float temp = 0;
-bool connected = false;
 bool instantBtnPrestate = false;
 bool screenBtnPrestate = false;
 
@@ -41,74 +63,6 @@ void serialPrintln(String text)
 #ifdef DEBUG
   Serial.println(text);
 #endif
-}
-
-bool connectToWifi()
-{
-  wifi.setupClientMode();
-  wifi.turnOffEchoMode();
-  wifi.connectToWifiAP("szentkuti_serleg_2ghz", "Jeromos210523");
-
-  return wifi.isConnected();
-}
-
-void displaySensorScreen(String soilmoisturepercent, String hum, String temp)
-{
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "Soil: " + soilmoisturepercent + " %");
-  displayUtils.addText(0, 10, "Hum: " + hum + " %");
-  displayUtils.addText(0, 20, "Temp: " + temp + " C");
-  displayUtils.print();
-}
-
-void displayNetworScreen(bool wifiStatus, bool lastPackageStatus)
-{
-  String wifiStatusText = wifiStatus ? "ok" : "err";
-  String lastPkgText = lastPackageStatus ? "ok" : "err";
-
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "WiFi: " + wifiStatusText);
-  displayUtils.addText(0, 10, "Last pkg.: " + lastPkgText);
-  displayUtils.print();
-}
-
-void displayInstantScreen()
-{
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "Instant");
-  displayUtils.print();
-  screenStatus = 0;
-  delay(3000);
-}
-
-void displayResetScreen()
-{
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "Reset");
-  displayUtils.print();
-}
-
-void displayStationScreens(bool wifiStatus, bool lastPackageStatus, String soilmoisturepercent, String hum, String temp)
-{
-  switch (screenStatus)
-  {
-  case 0:
-    displaySensorScreen(soilmoisturepercent, hum, temp);
-    break;
-  case 1:
-    displayNetworScreen(wifiStatus, lastPackageStatus);
-    break;
-  case 2: // OFF
-    displayUtils.clear();
-    displayUtils.print();
-    break;
-  case 3:
-    displayInstantScreen();
-    break;
-  case 4:
-    displayResetScreen();
-    break;
-  }
 }
 
 bool checkButton(int pinNumber, bool prestate)
@@ -132,7 +86,8 @@ void handleButtons()
   if (checkButton(INSTANT_BUTTON_PIN, instantBtnPrestate))
   {
     instantBtnPrestate = true;
-    screenStatus = 3;
+
+    stationEventHandler->instantMeasurementState();
   }
   else
   {
@@ -141,19 +96,9 @@ void handleButtons()
 
   if (checkButton(SCREEN_BUTTON_PIN, screenBtnPrestate))
   {
-    screenStatus++;
-
-    if (screenStatus > 2)
-    {
-      screenStatus = 0;
-    }
-
-    if (instantBtnPrestate)
-    {
-      screenStatus = 4;
-    }
-
     screenBtnPrestate = true;
+
+    stationEventHandler->nextScreenState();
   }
   else
   {
@@ -169,22 +114,15 @@ void setup()
 
   dht.begin();
   wifi.begin();
-  displayUtils.begin();
+  display.begin();
 
-  connectToWifi();
+  persistentState.Load();
+
+  measurementValues = new MeasurementValues();
+  stationEventHandler = new StationEventHandler(measurementValues, &persistentState, &display, &wifi);
 
   pinMode(INSTANT_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
-
-#ifndef DEBUG
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-#endif
-
-#ifdef DEBUG
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-#endif
 }
 
 void loop()
@@ -192,44 +130,15 @@ void loop()
   if (((millis() - startTime) > 600000) || instantBtnPrestate == true) // 10 minutes
   {
     startTime = millis();
-    int soilMoistureValue = analogRead(A0);
-    soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
-    hum = dht.readHumidity();
-    temp = dht.readTemperature();
+    measurementValues->setSoilMoistureValue(analogRead(A0));
+    measurementValues->setHumidity(dht.readHumidity());
+    measurementValues->setTemperature(dht.readTemperature());
 
-    if (soilmoisturepercent >= 100)
-    {
-      soilmoisturepercent = 100;
-    }
-
-    if (soilmoisturepercent <= 0)
-    {
-      soilmoisturepercent = 0;
-    }
-
-#ifdef DEBUG
-    serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
-#endif
-
-    connected = wifi.isConnected();
-    if (connected)
-    {
-      wifi.connectToTCPServer("192.168.88.207", "3333");
-      wifi.sendData("aa-1;0;1.1;2.2;3.11");
-      pkgStatus = wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
-      // wifi.closeConnection();
-    }
-    else
-    {
-      connected = connectToWifi();
-    }
+    wifi.httpPostData("http://192.168.88.252:3000/insert", stationEventHandler->generateRequestBody());
   }
 
   handleButtons();
+  stationEventHandler->displayCurrentState();
 
-  displayStationScreens(connected,
-                        pkgStatus,
-                        String(soilmoisturepercent),
-                        String(hum),
-                        String(temp));
+  //handle wifi module events
 }

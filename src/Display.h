@@ -1,9 +1,11 @@
-#ifndef DISPLAY_H
-#define DISPLAY_H
-
+#ifndef ADAGFX_H
+#define ADAGFX_H
 #include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#endif
 
+#ifndef ADASSD_H
+#define ADASSD_H
+#include <Adafruit_SSD1306.h>
 #endif
 
 class Display
@@ -19,3 +21,37 @@ public:
     void clear();
     ~Display();
 };
+
+
+Display::Display(Adafruit_SSD1306 *display)
+{
+    this->display = display;
+}
+
+void Display::begin()
+{
+    this->display->begin(SSD1306_SWITCHCAPVCC, 0x3C); //initialize with the I2C addr 0x3C (128x64)
+    this->display->clearDisplay();
+}
+
+void Display::addText(int x, int y, String text)
+{
+    display->setCursor(x, y);
+    display->setTextSize(1);
+    display->setTextColor(WHITE);
+    display->println(text);
+}
+
+void Display::print()
+{
+    display->display();
+}
+
+void Display::clear()
+{
+    display->clearDisplay();
+}
+
+Display::~Display()
+{
+}
