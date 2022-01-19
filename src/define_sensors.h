@@ -11,6 +11,6 @@
 
 // Buttons
 #define SCREEN_BUTTON_PIN 8
-#define INSTANT_BUTTON_PIN 9
+#define RESET_BUTTON_PIN 9
 
 #define STATION_ID "MUlnRG11emptOVAyRU1wWQo=" //base64

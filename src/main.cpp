@@ -55,14 +55,12 @@ MeasurementValues *measurementValues;
 StationEventHandler *stationEventHandler;
 
 unsigned long startTime = millis();
-bool instantBtnPrestate = false;
+bool resetBtnPrestate = false;
 bool screenBtnPrestate = false;
 
 void serialPrintln(String text)
 {
-#ifdef DEBUG
   Serial.println(text);
-#endif
 }
 
 bool checkButton(int pinNumber, bool prestate)
@@ -83,15 +81,15 @@ bool checkButton(int pinNumber, bool prestate)
 
 void handleButtons()
 {
-  if (checkButton(INSTANT_BUTTON_PIN, instantBtnPrestate))
+  if (checkButton(RESET_BUTTON_PIN, resetBtnPrestate))
   {
-    instantBtnPrestate = true;
+    resetBtnPrestate = true;
 
-    stationEventHandler->instantMeasurementState();
+    stationEventHandler->resetState();
   }
   else
   {
-    instantBtnPrestate = false;
+    resetBtnPrestate = false;
   }
 
   if (checkButton(SCREEN_BUTTON_PIN, screenBtnPrestate))
@@ -108,9 +106,7 @@ void handleButtons()
 
 void setup()
 {
-#ifdef DEBUG
   Serial.begin(9600);
-#endif
 
   dht.begin();
   wifi.begin();
@@ -121,24 +117,38 @@ void setup()
   measurementValues = new MeasurementValues();
   stationEventHandler = new StationEventHandler(measurementValues, &persistentState, &display, &wifi);
 
-  pinMode(INSTANT_BUTTON_PIN, INPUT);
+  pinMode(RESET_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
 }
 
 void loop()
 {
-  if (((millis() - startTime) > 600000) || instantBtnPrestate == true) // 10 minutes
+  if (stationEventHandler->isResetModeActive())
   {
-    startTime = millis();
-    measurementValues->setSoilMoistureValue(analogRead(A0));
-    measurementValues->setHumidity(dht.readHumidity());
-    measurementValues->setTemperature(dht.readTemperature());
+    // display the config info
+    // sleep
+    // display the sensor raw data
+    // sleep
+  }
+  else
+  {
+    if ((millis() - startTime) > 600000) // 10 minutes
+    {
+      startTime = millis();
 
-    wifi.httpPostData("http://192.168.88.252:3000/insert", stationEventHandler->generateRequestBody());
+      measurementValues->setSoilMoistureValue(analogRead(A0));
+      measurementValues->setHumidity(dht.readHumidity());
+      measurementValues->setTemperature(dht.readTemperature());
+
+      if (stationEventHandler->isEnabledToSendData())
+      {
+        wifi.httpPostData("http://192.168.88.252:3000/insert", stationEventHandler->generateRequestBody());
+      }
+    }
   }
 
   handleButtons();
-  stationEventHandler->displayCurrentState();
 
-  //handle wifi module events
+  stationEventHandler->displayCurrentState();
+  stationEventHandler->processWiFiEvents();
 }

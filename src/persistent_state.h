@@ -2,6 +2,8 @@ struct PersistentState
 {
     unsigned airValue;
     unsigned waterValue;
+    bool wifiConfigured;
+    bool resetState;
 
     void Reset()
     {
@@ -9,5 +11,7 @@ struct PersistentState
         // stored in the eeprom yet.
         airValue = 615;
         waterValue = 249;
+        wifiConfigured = false;
+        resetState = false;
     }
 };

@@ -1,3 +1,5 @@
+// https://www.megunolink.com/documentation/arduino-libraries/eepromstore
+
 // Only supported for AVR micros because we use the special EEMEM directive
 // to automatically allocated memory in the eeprom.
 #if defined(__AVR__)

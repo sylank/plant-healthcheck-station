@@ -21,7 +21,7 @@ public:
     void httpPostData(String serverURL, String jsonStr);
     void idleMode();
 
-    bool isConnectedToNetwork();
+    void isConnectedToNetwork();
 
     String readDataFromWiFiModule();
 
@@ -58,7 +58,7 @@ void Wifi::idleMode()
     serial->println("1");
 }
 
-bool Wifi::isConnectedToNetwork()
+void Wifi::isConnectedToNetwork()
 {
     serial->println("3");
 }
