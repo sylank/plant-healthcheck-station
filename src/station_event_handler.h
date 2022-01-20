@@ -97,8 +97,20 @@ bool StationEventHandler::isResetModeActive()
     return persistentState->Data.resetState == true;
 }
 
-void StationEventHandler::nextScreenState() {}
-void StationEventHandler::instantMeasurementState() {}
+void StationEventHandler::nextScreenState()
+{
+    stateIndex++;
+
+    if (stateIndex > 2)
+    {
+        stateIndex = 0;
+    }
+}
+
+void StationEventHandler::instantMeasurementState()
+{
+    stateIndex = 3;
+}
 
 void StationEventHandler::resetState()
 {

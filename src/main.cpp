@@ -25,7 +25,6 @@
 #endif
 
 #include "define_sensors.h"
-#include "define_utils.h"
 
 #ifndef STATIONEVENTHANDLER_H
 #define STATIONEVENTHANDLER_H
