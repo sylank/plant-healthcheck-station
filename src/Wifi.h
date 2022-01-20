@@ -35,7 +35,7 @@ Wifi::Wifi(SoftwareSerial *serial)
 
 void Wifi::begin()
 {
-    serial->begin(9600);
+    serial->begin(115200);
 }
 
 void Wifi::initConfigServer(String ssid, String password)

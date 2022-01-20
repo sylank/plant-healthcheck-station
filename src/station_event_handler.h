@@ -51,6 +51,8 @@ private:
     void displayAPFailedScreen();
     void displayAPInfoScreen();
 
+    void exitFromConfiguration();
+
     int calculateSoilMoisturePercent();
     String sensorValuesToJSON();
 
@@ -82,6 +84,7 @@ StationEventHandler::StationEventHandler(MeasurementValues *measurementValues, E
     this->wifi = wifi;
 
     apCreationRetryCount = 0;
+    stateIndex = 0;
 }
 
 bool StationEventHandler::isEnabledToSendData()
@@ -101,9 +104,21 @@ void StationEventHandler::resetState()
 {
     stateIndex = 4;
     persistentState->Reset();
+    persistentState->Data.resetState = true;
     persistentState->Save();
 
-    wifi->initConfigServer("Plant_Healthcheck_Station", "123456789");
+    wifi->initConfigServer("Plant_Healthcheck_Station", "*");
+}
+
+void StationEventHandler::exitFromConfiguration()
+{
+    wifi->idleMode();
+
+    persistentState->Data.resetState = false;
+    persistentState->Data.wifiConfigured = false;
+    persistentState->Save();
+
+    stateIndex = 0;
 }
 
 void StationEventHandler::displayCurrentState()
@@ -186,8 +201,8 @@ void StationEventHandler::displayAPInfoScreen()
 {
     display->clear();
     display->addText(0, 0, "Wifi:" + configServerSSID);
-    display->addText(0, 10, "Pwd:" + configServerPassowrd);
-    display->addText(0, 20, "Host: http://" + apIpAddress);
+    display->addText(0, 10, "Host: http://" + apIpAddress);
+    display->addText(0, 20, "Soil moisture value:" + String(this->measurementValues->getSoilMoistureValue()));
     display->print();
 }
 
@@ -287,19 +302,23 @@ void StationEventHandler::processWiFiEvents()
         stateIndex = 6;
     }
 
-    if (message == "#CUSTOM_CFG !{ VAL1 } !{ VAL2 }")
+    if (message.indexOf("#CUSTOM_CFG") == 0)
     {
         String airValue = getMessageElement(message, '!', 1);
         String waterValue = getMessageElement(message, '!', 2);
 
         persistentState->Data.airValue = atoi(airValue.c_str());
         persistentState->Data.waterValue = atoi(waterValue.c_str());
-
         persistentState->Save();
     }
 
     if (message == "#CONFIG_DONE")
     {
+        persistentState->Data.wifiConfigured = true;
+        persistentState->Data.resetState = false;
+        persistentState->Save();
+
+        stateIndex = 0;
     }
 }
 

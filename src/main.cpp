@@ -125,14 +125,11 @@ void loop()
 {
   if (stationEventHandler->isResetModeActive())
   {
-    // display the config info
-    // sleep
-    // display the sensor raw data
-    // sleep
+    measurementValues->setSoilMoistureValue(analogRead(A0));
   }
   else
   {
-    if ((millis() - startTime) > 600000) // 10 minutes
+    if ((millis() - startTime) > TEN_MINUTES)
     {
       startTime = millis();
 

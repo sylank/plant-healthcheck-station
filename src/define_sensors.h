@@ -14,3 +14,5 @@
 #define RESET_BUTTON_PIN 9
 
 #define STATION_ID "MUlnRG11emptOVAyRU1wWQo=" //base64
+
+#define TEN_MINUTES 600000
