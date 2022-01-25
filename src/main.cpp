@@ -15,7 +15,6 @@
 #include "Wifi.h"
 
 #include "define_sensors.h"
-#include "define_utils.h"
 
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 
@@ -24,6 +23,8 @@ Display displayUtils(&adisplay);
 
 SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
 Wifi wifi(&aserial);
+
+String stationId = "MUlnRG11emptOVAyRU1wWQo=";
 
 int screenStatus = 0;
 
@@ -35,22 +36,6 @@ float temp = 0;
 bool connected = false;
 bool instantBtnPrestate = false;
 bool screenBtnPrestate = false;
-
-void serialPrintln(String text)
-{
-#ifdef DEBUG
-  Serial.println(text);
-#endif
-}
-
-bool connectToWifi()
-{
-  wifi.setupClientMode();
-  wifi.turnOffEchoMode();
-  wifi.connectToWifiAP("szentkuti_serleg_2ghz", "Jeromos210523");
-
-  return wifi.isConnected();
-}
 
 void displaySensorScreen(String soilmoisturepercent, String hum, String temp)
 {
@@ -163,33 +148,21 @@ void handleButtons()
 
 void setup()
 {
-#ifdef DEBUG
   Serial.begin(9600);
-#endif
 
   dht.begin();
   wifi.begin();
   displayUtils.begin();
 
-  connectToWifi();
-
   pinMode(INSTANT_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
 
-#ifndef DEBUG
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-#endif
-
-#ifdef DEBUG
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-#endif
+  aserial.println("1");
 }
 
 void loop()
 {
-  if (((millis() - startTime) > 600000) || instantBtnPrestate == true) // 10 minutes
+  if (((millis() - startTime) > TEN_MINUTES) || instantBtnPrestate == true)
   {
     startTime = millis();
     int soilMoistureValue = analogRead(A0);
@@ -207,22 +180,12 @@ void loop()
       soilmoisturepercent = 0;
     }
 
-#ifdef DEBUG
-    serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
-#endif
+    Serial.println("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
 
-    connected = wifi.isConnected();
-    if (connected)
-    {
-      wifi.connectToTCPServer("192.168.88.207", "3333");
-      wifi.sendData("aa-1;0;1.1;2.2;3.11");
-      pkgStatus = wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
-      // wifi.closeConnection();
-    }
-    else
-    {
-      connected = connectToWifi();
-    }
+    String payload = "{\"sensor_id\":\"" + stationId + "\", \"temperature\": " + String(temp) + ", \"humidity\": " + String(hum) + ", \"soil_moisture\": " + String(soilmoisturepercent) + "}";
+    Serial.println(payload);
+    wifi.httpPostData(F("http://192.168.88.252:3000/insert"), payload);
+    Serial.println("sent");
   }
 
   handleButtons();
@@ -232,4 +195,10 @@ void loop()
                         String(soilmoisturepercent),
                         String(hum),
                         String(temp));
+
+  String data = wifi.readDataFromWiFiModule();
+  if (data.length() != 0)
+  {
+    Serial.println(data);
+  }
 }

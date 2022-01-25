@@ -3,7 +3,7 @@
 #define DHTTYPE DHT22 // DHT 22  (AM2302)
 
 // Screen
-#define OLED_RESET 4
+#define OLED_RESET -1
 
 //Software serial
 #define SOFT_S_RX 2
@@ -16,3 +16,5 @@
 // Soil moisture
 #define AIR_VALUE 615   //you need to replace this value with Value_1
 #define WATER_VALUE 249 //you need to replace this value with Value_2
+
+#define TEN_MINUTES 600000
