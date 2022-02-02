@@ -16,7 +16,7 @@ private:
 public:
     Display(Adafruit_SSD1306 *display);
     void begin();
-    void addText(int x, int y, String text);
+    void addText(const int &x, const int &y, const String &text);
     void print();
     void clear();
     ~Display();
@@ -33,7 +33,7 @@ void Display::begin()
     this->display->clearDisplay();
 }
 
-void Display::addText(int x, int y, String text)
+void Display::addText(const int &x, const int &y, const String &text)
 {
     display->setCursor(x, y);
     display->setTextSize(1);

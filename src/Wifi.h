@@ -14,9 +14,9 @@ public:
     Wifi(SoftwareSerial *serial);
     void begin();
 
-    void initConfigServer(String ssid, String password);
+    void initConfigServer(const String &ssid, const String &password);
     void connectToStoredNetwork();
-    void httpPostData(String serverURL, String jsonStr);
+    void httpPostData(const String &serverURL, const String &jsonStr);
     void idleMode();
 
     void isConnectedToNetwork();
@@ -36,7 +36,7 @@ void Wifi::begin()
     serial->begin(9600);
 }
 
-void Wifi::initConfigServer(String ssid, String password)
+void Wifi::initConfigServer(const String &ssid, const String &password)
 {
     serial->println("0#" + ssid + "!" + password);
 }
@@ -46,14 +46,14 @@ void Wifi::connectToStoredNetwork()
     serial->println("1");
 }
 
-void Wifi::httpPostData(String serverURL, String jsonStr)
+void Wifi::httpPostData(const String &serverURL, const String &jsonStr)
 {
     serial->println("2#" + serverURL + "!" + jsonStr);
 }
 
 void Wifi::idleMode()
 {
-    serial->println("1");
+    serial->println("9");
 }
 
 void Wifi::isConnectedToNetwork()
@@ -75,6 +75,7 @@ String Wifi::readDataFromWiFiModule()
             if (serial->available())
             {
                 charIn = serial->read();
+                // Serial.println(charIn);
                 responseBuffer += charIn;
             }
             if (responseBuffer.endsWith("\n"))
