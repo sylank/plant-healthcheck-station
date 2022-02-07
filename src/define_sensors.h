@@ -2,9 +2,6 @@
 #define DHTPIN 7      // what pin we're connected to
 #define DHTTYPE DHT22 // DHT 22  (AM2302)
 
-// Screen
-#define OLED_RESET -1
-
 //Software serial
 #define SOFT_S_RX 2
 #define SOFT_S_TX 3
