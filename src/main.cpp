@@ -348,6 +348,8 @@ void loop()
                           String(soilmoisturepercent),
                           String(hum),
                           String(temp));
+
+    wifi.isConnectedToNetwork();
   }
 
   handleButtons();
