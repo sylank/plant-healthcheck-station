@@ -52,57 +52,26 @@ float temp = 0;
 
 bool instantBtnPrestate = false;
 bool screenBtnPrestate = false;
-bool refresh = false;
 
-void displaySensorScreen(const String &soilmoisturepercent, const String &hum, const String &temp)
+String apIPAddress = "0.0.0.0";
+
+void displaySensorScreen()
 {
-  oled.println("Soil moisture: " + soilmoisturepercent + "%");
-  oled.println("Humidity: " + hum + "%");
-  oled.println("Temperature:" + temp + "C");
+  oled.clear();
+  oled.println("Soil moisture: " + String(soilmoisturepercent) + "%");
+  oled.println("Humidity: " + String(hum) + "%");
+  oled.println("Temperature:" + String(temp) + "C");
 }
 
-void displayNetworScreen(const bool &wifiStatus, const bool &lastPackageStatus)
+void displayNetworScreen()
 {
-  String wifiStatusText = wifiStatus ? "ok" : "err";
-  String lastPkgText = lastPackageStatus ? "ok" : "err";
+  String wifiStatusText = connected ? "ok" : "err";
+  String lastPkgText = pkgStatus ? "ok" : "err";
 
+  oled.clear();
   oled.println("Connection:" + wifiStatusText);
   oled.println("IP:" + ipAddress);
   oled.println("HTTP status:" + lastPkgText + "-" + transferStatusCode);
-}
-
-void displayInstantScreen()
-{
-  oled.println("Instant");
-  screenStatus = 0;
-  delay(3000);
-}
-
-void displayResetScreen()
-{
-  oled.println("Reset");
-}
-
-void displayStationScreens(const bool &wifiStatus, const bool &lastPackageStatus, const String &soilmoisturepercent, const String &hum, const String &temp)
-{
-  switch (screenStatus)
-  {
-  case 0:
-    displaySensorScreen(soilmoisturepercent, hum, temp);
-    break;
-  case 1:
-    displayNetworScreen(wifiStatus, lastPackageStatus);
-    break;
-  case 2: // OFF
-    oled.clear();
-    break;
-  case 3:
-    displayInstantScreen();
-    break;
-  case 4:
-    displayResetScreen();
-    break;
-  }
 }
 
 bool checkButton(const int &pinNumber, const bool &prestate)
@@ -130,10 +99,8 @@ void handleButtons()
   {
     if (!instantBtnPrestate)
     {
-      screenStatus = 3;
-
       instantBtnPrestate = true;
-      refresh = true;
+      // wifi.initConfigServer("aaa", "123456789");
     }
   }
   else
@@ -145,6 +112,7 @@ void handleButtons()
   {
     if (!screenBtnPrestate)
     {
+      screenBtnPrestate = true;
       screenStatus++;
 
       if (screenStatus > 2)
@@ -152,24 +120,23 @@ void handleButtons()
         screenStatus = 0;
       }
 
-      screenBtnPrestate = true;
-      refresh = true;
+      switch (screenStatus)
+      {
+      case 0:
+        displaySensorScreen();
+        break;
+      case 1:
+        displayNetworScreen();
+        break;
+      case 2: // OFF
+        oled.clear();
+        break;
+      }
     }
   }
   else
   {
     screenBtnPrestate = false;
-  }
-
-  if ((instantBtnPrestate || screenBtnPrestate) && refresh)
-  {
-    oled.clear();
-    displayStationScreens(connected,
-                          pkgStatus,
-                          String(soilmoisturepercent),
-                          String(hum),
-                          String(temp));
-    refresh = false;
   }
 }
 
@@ -212,12 +179,13 @@ void processWiFiEvents()
   //   }
   // }
 
-  // if (message.indexOf("#AP_READY") == 0)
-  // {
-  //   apIpAddress = message.substring(message.indexOf('!') + 1, message.length());
-  //   stateIndex = 6;
-  //   apCreationRetryCount = 0;
-  // }
+  if (message.indexOf("#AP_READY") == 0)
+  {
+    apIPAddress = message.substring(message.indexOf('!') + 1, message.length());
+    Serial.println(apIPAddress);
+    // stateIndex = 6;
+    // apCreationRetryCount = 0;
+  }
 
   if (message.indexOf(F("#WIFI_CONNECTED")) == 0)
   {
@@ -288,7 +256,7 @@ void displayBegin()
   oled.begin(&Adafruit128x64, DISPLAY_ADDRESS);
   oled.setFont(X11fixed7x14);
   oled.clear();
-  Wire.setClock(400000L);
+  oled.setI2cClock(900000L);
 }
 
 void setup()
@@ -302,21 +270,16 @@ void setup()
   pinMode(INSTANT_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
 
-  delay(2000);
   wifi.isConnectedToNetwork();
 
-  oled.clear();
-  displayStationScreens(connected,
-                        pkgStatus,
-                        String(soilmoisturepercent),
-                        String(hum),
-                        String(temp));
+  displaySensorScreen();
 }
 
 void loop()
 {
-  if (((millis() - startTime) > TEN_MINUTES) || instantBtnPrestate == true)
+  if (((millis() - startTime) > TEN_MINUTES) || instantBtnPrestate)
   {
+    instantBtnPrestate = false;
     startTime = millis();
     int soilMoistureValue = analogRead(A0);
     soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
@@ -342,13 +305,7 @@ void loop()
       wifi.connectToStoredNetwork();
     }
 
-    oled.clear();
-    displayStationScreens(connected,
-                          pkgStatus,
-                          String(soilmoisturepercent),
-                          String(hum),
-                          String(temp));
-
+    displaySensorScreen();
     wifi.isConnectedToNetwork();
   }
 
