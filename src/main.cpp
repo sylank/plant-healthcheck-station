@@ -1,117 +1,118 @@
+// MEMORY_PRINT_START
+// MEMORY_PRINT_HEAPSTART
+// MEMORY_PRINT_HEAPEND
+// MEMORY_PRINT_STACKSTART
+// MEMORY_PRINT_END
+// MEMORY_PRINT_HEAPSIZE
+// FREERAM_PRINT;
 #include <Wire.h>
+#include <MemoryUsage.h>
 
-#ifndef DISPLAY_H
-#define DISPLAY_H
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#endif
 #include <DHT.h>
+
 #ifndef WIFI_H
 #define WIFI_H
 #include <SoftwareSerial.h>
 #endif
 
-#include "Display.h"
 #include "Wifi.h"
 
 #include "define_sensors.h"
-#include "define_utils.h"
+
+#include "SSD1306Ascii.h"
+#include "SSD1306AsciiAvrI2c.h"
+
+#include "EEPROMStore.h"
+#include "persistent_state.h"
+
+#include <SimpleKalmanFilter.h>
 
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
-
-Adafruit_SSD1306 adisplay(OLED_RESET);
-Display displayUtils(&adisplay);
+//https://github.com/greiman/SSD1306Ascii
+SSD1306AsciiAvrI2c oled;
 
 SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
-Wifi wifi(&aserial);
+Wifi wifi(aserial);
+
+EEPROMStore<PersistentState> persistentState;
+
+SimpleKalmanFilter simpleKalmanFilter(2, 2, 0.01);
+
+String stationId = "1";
 
 int screenStatus = 0;
 
-unsigned long startTime = millis();
+unsigned long lastMeasurementTime = millis();
+unsigned long lastConfigDisplayTime = millis();
+
 bool pkgStatus = false;
-int soilmoisturepercent = 0;
-float hum = 0; // use int ?
-float temp = 0;
+String transferStatusCode = "0";
 bool connected = false;
-bool instantBtnPrestate = false;
+String ipAddress = "0.0.0.0";
+
+int soilMoistureValue = 0;
+int soilMoisturePercent = 0;
+float humidity = 0;
+float temperature = 0;
+
+bool resetBtnPrestate = false;
 bool screenBtnPrestate = false;
 
-void serialPrintln(String text)
+String apIPAddress = "0.0.0.0";
+bool resetMode = false;
+unsigned int apCreationRetryCount = 0;
+unsigned const int maxRetryCount = 3;
+
+void displaySensorScreen()
 {
-#ifdef DEBUG
-  Serial.println(text);
-#endif
+  oled.clear();
+  oled.println("Soil moisture: " + String(soilMoisturePercent) + "%");
+  oled.println("Humidity: " + String(humidity) + "%");
+  oled.println("Temperature:" + String(temperature) + "C");
 }
 
-bool connectToWifi()
+void displayNetworScreen()
 {
-  wifi.setupClientMode();
-  wifi.turnOffEchoMode();
-  wifi.connectToWifiAP("szentkuti_serleg_2ghz", "Jeromos210523");
+  String wifiStatusText = connected ? "ok" : "err";
+  String lastPkgText = pkgStatus ? "ok" : "err";
 
-  return wifi.isConnected();
+  oled.clear();
+  oled.println("Connection:" + wifiStatusText);
+  oled.println("IP:" + ipAddress);
+  oled.println("HTTP status:" + lastPkgText + "-" + transferStatusCode);
 }
 
-void displaySensorScreen(String soilmoisturepercent, String hum, String temp)
+void displayConfigScreen()
 {
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "Soil: " + soilmoisturepercent + " %");
-  displayUtils.addText(0, 10, "Hum: " + hum + " %");
-  displayUtils.addText(0, 20, "Temp: " + temp + " C");
-  displayUtils.print();
+  oled.clear();
+  oled.println(F("SSID: PHCS-conf"));
+  oled.println(F("PWD: 123456789"));
+  oled.println("IP:" + apIPAddress);
+  oled.println("Soil value:" + String(soilMoistureValue));
 }
 
-void displayNetworScreen(bool wifiStatus, bool lastPackageStatus)
+void displayLoadingScreen()
 {
-  String wifiStatusText = wifiStatus ? "ok" : "err";
-  String lastPkgText = lastPackageStatus ? "ok" : "err";
-
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "WiFi: " + wifiStatusText);
-  displayUtils.addText(0, 10, "Last pkg.: " + lastPkgText);
-  displayUtils.print();
+  oled.clear();
+  oled.println(F("Loading..."));
 }
 
-void displayInstantScreen()
+void displayErrorScreen(const String &message)
 {
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "Instant");
-  displayUtils.print();
-  screenStatus = 0;
-  delay(3000);
+  oled.clear();
+  oled.println(message);
 }
 
-void displayResetScreen()
+void resetModule()
 {
-  displayUtils.clear();
-  displayUtils.addText(0, 0, "Reset");
-  displayUtils.print();
+  resetBtnPrestate = true;
+  displayLoadingScreen();
+  persistentState.Reset();
+  persistentState.Save();
+  wifi.initConfigServer("PHCS-conf", "123456789");
 }
 
-void displayStationScreens(bool wifiStatus, bool lastPackageStatus, String soilmoisturepercent, String hum, String temp)
-{
-  switch (screenStatus)
-  {
-  case 0:
-    displaySensorScreen(soilmoisturepercent, hum, temp);
-    break;
-  case 1:
-    displayNetworScreen(wifiStatus, lastPackageStatus);
-    break;
-  case 2: // OFF
-    displayUtils.clear();
-    displayUtils.print();
-    break;
-  case 3:
-    displayInstantScreen();
-    break;
-  case 4:
-    displayResetScreen();
-    break;
-  }
-}
-
-bool checkButton(int pinNumber, bool prestate)
+bool checkButton(const int &pinNumber, const bool &prestate)
 {
   int btnState = digitalRead(pinNumber);
 
@@ -129,31 +130,46 @@ bool checkButton(int pinNumber, bool prestate)
 
 void handleButtons()
 {
-  if (checkButton(INSTANT_BUTTON_PIN, instantBtnPrestate))
+  int resetValue = digitalRead(RESET_BUTTON_PIN);
+  int screenValue = digitalRead(SCREEN_BUTTON_PIN);
+
+  if (resetValue == HIGH)
   {
-    instantBtnPrestate = true;
-    screenStatus = 3;
+    if (!resetBtnPrestate)
+    {
+      resetModule();
+    }
   }
   else
   {
-    instantBtnPrestate = false;
+    resetBtnPrestate = false;
   }
 
-  if (checkButton(SCREEN_BUTTON_PIN, screenBtnPrestate))
+  if (screenValue == HIGH)
   {
-    screenStatus++;
-
-    if (screenStatus > 2)
+    if (!screenBtnPrestate)
     {
-      screenStatus = 0;
-    }
+      screenBtnPrestate = true;
+      screenStatus++;
 
-    if (instantBtnPrestate)
-    {
-      screenStatus = 4;
-    }
+      if (screenStatus > 2)
+      {
+        screenStatus = 0;
+      }
 
-    screenBtnPrestate = true;
+      switch (screenStatus)
+      {
+      case 0:
+        displaySensorScreen();
+        break;
+      case 1:
+        displayNetworScreen();
+        break;
+      case 2: // OFF
+        oled.clear();
+        break;
+      }
+    }
   }
   else
   {
@@ -161,75 +177,179 @@ void handleButtons()
   }
 }
 
+// https://stackoverflow.com/questions/9072320/split-string-into-string-array
+String getMessageElement(const String &data, char separator, int index)
+{
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length() - 1;
+
+  for (int i = 0; i <= maxIndex && found <= index; i++)
+  {
+    if (data.charAt(i) == separator || i == maxIndex)
+    {
+      found++;
+      strIndex[0] = strIndex[1] + 1;
+      strIndex[1] = (i == maxIndex) ? i + 1 : i;
+    }
+  }
+
+  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
+void processWiFiEvents()
+{
+  String message = wifi.readDataFromWiFiModule();
+
+  if (message.length() != 0)
+  {
+    Serial.println(message);
+  }
+
+  if (message == F("#TRANSPORT_OK"))
+  {
+    pkgStatus = true;
+    transferStatusCode = "200";
+  }
+
+  if (message == F("#AP_FAILED"))
+  {
+    if (apCreationRetryCount < maxRetryCount)
+    {
+      delay(2000);
+      apCreationRetryCount++;
+      resetModule();
+    }
+    else
+    {
+      displayErrorScreen(F("WiFi AP\nsetup failed :("));
+    }
+  }
+
+  if (message.indexOf(F("#AP_READY")) == 0)
+  {
+    apIPAddress = message.substring(message.indexOf('!') + 1, message.length());
+    displayConfigScreen();
+    resetMode = true;
+  }
+
+  if (message.indexOf(F("#WIFI_CONNECTED")) == 0)
+  {
+    connected = true;
+    ipAddress = message.substring(message.indexOf('!') + 1, message.length());
+  }
+
+  if (message == F("#WIFI_CONNECTION_FAILED"))
+  {
+    connected = false;
+    ipAddress = "0.0.0.0";
+  }
+
+  if (message.indexOf(F("#TRANSPORT_FAILED")) == 0)
+  {
+    pkgStatus = false;
+
+    transferStatusCode = message.substring(message.indexOf('!') + 1, message.length());
+  }
+
+  if (message == F("#CONFIG_FAILED"))
+  {
+    displayErrorScreen(F("Configuration failed :("));
+  }
+
+  if (message.indexOf(F("#CUSTOM_CFG")) == 0)
+  {
+    String airValue = getMessageElement(message, '!', 1);
+    String waterValue = getMessageElement(message, '!', 2);
+
+    persistentState.Data.airValue = atoi(airValue.c_str());
+    persistentState.Data.waterValue = atoi(waterValue.c_str());
+    persistentState.Save();
+  }
+
+  if (message == F("#CONFIG_DONE"))
+  {
+    resetMode = false;
+    displaySensorScreen();
+  }
+}
+
+void displayBegin()
+{
+  oled.begin(&Adafruit128x64, DISPLAY_ADDRESS);
+  oled.setFont(X11fixed7x14);
+  oled.clear();
+  oled.setI2cClock(900000L);
+}
+
 void setup()
 {
-#ifdef DEBUG
   Serial.begin(9600);
-#endif
 
+  displayBegin();
   dht.begin();
   wifi.begin();
-  displayUtils.begin();
+  persistentState.Load();
 
-  connectToWifi();
-
-  pinMode(INSTANT_BUTTON_PIN, INPUT);
+  pinMode(RESET_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
 
-#ifndef DEBUG
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-#endif
+  wifi.isConnectedToNetwork();
 
-#ifdef DEBUG
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, HIGH);
-#endif
+  displaySensorScreen();
+}
+
+void makeMeasurement()
+{
+  soilMoistureValue = analogRead(A0);
+  soilMoistureValue = simpleKalmanFilter.updateEstimate(soilMoistureValue);
+  soilMoisturePercent = map(soilMoistureValue, persistentState.Data.airValue, persistentState.Data.waterValue, 0, 100);
+  humidity = dht.readHumidity();
+  temperature = dht.readTemperature();
+
+  if (soilMoisturePercent >= 100)
+  {
+    soilMoisturePercent = 100;
+  }
+
+  if (soilMoisturePercent <= 0)
+  {
+    soilMoisturePercent = 0;
+  }
 }
 
 void loop()
 {
-  if (((millis() - startTime) > 600000) || instantBtnPrestate == true) // 10 minutes
+  if (resetMode)
   {
-    startTime = millis();
-    int soilMoistureValue = analogRead(A0);
-    soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
-    hum = dht.readHumidity();
-    temp = dht.readTemperature();
-
-    if (soilmoisturepercent >= 100)
+    if (((millis() - lastConfigDisplayTime) > TWO_SECONDS))
     {
-      soilmoisturepercent = 100;
+      lastConfigDisplayTime = millis();
+      makeMeasurement();
+      displayConfigScreen();
     }
+  }
 
-    if (soilmoisturepercent <= 0)
-    {
-      soilmoisturepercent = 0;
-    }
+  if (((millis() - lastMeasurementTime) > TEN_MINUTES))
+  {
+    resetBtnPrestate = false;
+    lastMeasurementTime = millis();
+    makeMeasurement();
 
-#ifdef DEBUG
-    serialPrintln("T " + String(temp) + " H " + String(hum) + " SM " + String(soilmoisturepercent) + " SMV " + String(soilMoistureValue));
-#endif
-
-    connected = wifi.isConnected();
     if (connected)
     {
-      wifi.connectToTCPServer("192.168.88.207", "3333");
-      wifi.sendData("aa-1;0;1.1;2.2;3.11");
-      pkgStatus = wifi.sendData2("aa-1;0;" + String(temp) + ";" + String(hum) + ";" + String(soilmoisturepercent));
-      // wifi.closeConnection();
+      wifi.httpPostData(F("http://192.168.88.207:3000/insert"), "{\"sensor_id\":\"" + stationId + "\", \"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + ", \"soil_moisture\": " + String(soilMoisturePercent) + "}");
     }
     else
     {
-      connected = connectToWifi();
+      wifi.connectToStoredNetwork();
     }
+
+    displaySensorScreen();
+    wifi.isConnectedToNetwork();
   }
 
   handleButtons();
 
-  displayStationScreens(connected,
-                        pkgStatus,
-                        String(soilmoisturepercent),
-                        String(hum),
-                        String(temp));
+  processWiFiEvents();
 }
