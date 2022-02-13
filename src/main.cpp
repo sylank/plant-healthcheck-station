@@ -25,6 +25,8 @@
 #include "EEPROMStore.h"
 #include "persistent_state.h"
 
+#include <SimpleKalmanFilter.h>
+
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 //https://github.com/greiman/SSD1306Ascii
 SSD1306AsciiAvrI2c oled;
@@ -33,6 +35,8 @@ SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
 Wifi wifi(aserial);
 
 EEPROMStore<PersistentState> persistentState;
+
+SimpleKalmanFilter simpleKalmanFilter(2, 2, 0.01);
 
 String stationId = "1";
 
@@ -298,6 +302,7 @@ void setup()
 void makeMeasurement()
 {
   soilMoistureValue = analogRead(A0);
+  soilMoistureValue = simpleKalmanFilter.updateEstimate(soilMoistureValue);
   soilMoisturePercent = map(soilMoistureValue, persistentState.Data.airValue, persistentState.Data.waterValue, 0, 100);
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
