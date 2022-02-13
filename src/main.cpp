@@ -22,12 +22,6 @@
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiAvrI2c.h"
 
-// 0X3C+SA0 - 0x3C or 0x3D
-#define DISPLAY_ADDRESS 0x3C
-#define RST_PIN -1
-
-void displayBegin();
-
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 //https://github.com/greiman/SSD1306Ascii
 SSD1306AsciiAvrI2c oled;
@@ -39,28 +33,31 @@ String stationId = "1";
 
 int screenStatus = 0;
 
-unsigned long startTime = millis();
+unsigned long lastMeasurementTime = millis();
+unsigned long lastConfigDisplayTime = millis();
 
 bool pkgStatus = false;
 String transferStatusCode = "0";
 bool connected = false;
 String ipAddress = "0.0.0.0";
 
-int soilmoisturepercent = 0;
-float hum = 0;
-float temp = 0;
+int soilMoistureValue = 0;
+int soilMoisturePercent = 0;
+float humidity = 0;
+float temperature = 0;
 
-bool instantBtnPrestate = false;
+bool resetBtnPrestate = false;
 bool screenBtnPrestate = false;
 
 String apIPAddress = "0.0.0.0";
+bool resetMode = false;
 
 void displaySensorScreen()
 {
   oled.clear();
-  oled.println("Soil moisture: " + String(soilmoisturepercent) + "%");
-  oled.println("Humidity: " + String(hum) + "%");
-  oled.println("Temperature:" + String(temp) + "C");
+  oled.println("Soil moisture: " + String(soilMoisturePercent) + "%");
+  oled.println("Humidity: " + String(humidity) + "%");
+  oled.println("Temperature:" + String(temperature) + "C");
 }
 
 void displayNetworScreen()
@@ -72,6 +69,21 @@ void displayNetworScreen()
   oled.println("Connection:" + wifiStatusText);
   oled.println("IP:" + ipAddress);
   oled.println("HTTP status:" + lastPkgText + "-" + transferStatusCode);
+}
+
+void displayConfigScreen()
+{
+  oled.clear();
+  oled.println(F("SSID: PHCS-conf"));
+  oled.println(F("PWD: 123456789"));
+  oled.println("IP:" + apIPAddress);
+  oled.println("Soil value:" + String(soilMoistureValue));
+}
+
+void displayLoadingScreen()
+{
+  oled.clear();
+  oled.println(F("Loading..."));
 }
 
 bool checkButton(const int &pinNumber, const bool &prestate)
@@ -92,20 +104,21 @@ bool checkButton(const int &pinNumber, const bool &prestate)
 
 void handleButtons()
 {
-  int instantValue = digitalRead(INSTANT_BUTTON_PIN);
+  int resetValue = digitalRead(RESET_BUTTON_PIN);
   int screenValue = digitalRead(SCREEN_BUTTON_PIN);
 
-  if (instantValue == HIGH)
+  if (resetValue == HIGH)
   {
-    if (!instantBtnPrestate)
+    if (!resetBtnPrestate)
     {
-      instantBtnPrestate = true;
-      // wifi.initConfigServer("aaa", "123456789");
+      resetBtnPrestate = true;
+      displayLoadingScreen();
+      wifi.initConfigServer("PHCS-conf", "123456789");
     }
   }
   else
   {
-    instantBtnPrestate = false;
+    resetBtnPrestate = false;
   }
 
   if (screenValue == HIGH)
@@ -149,7 +162,6 @@ void processWiFiEvents()
     Serial.println(message);
   }
 
-  // message.trim();
   if (message == F("#TRANSPORT_OK"))
   {
     pkgStatus = true;
@@ -182,9 +194,8 @@ void processWiFiEvents()
   if (message.indexOf("#AP_READY") == 0)
   {
     apIPAddress = message.substring(message.indexOf('!') + 1, message.length());
-    Serial.println(apIPAddress);
-    // stateIndex = 6;
-    // apCreationRetryCount = 0;
+    displayConfigScreen();
+    resetMode = true;
   }
 
   if (message.indexOf(F("#WIFI_CONNECTED")) == 0)
@@ -221,14 +232,11 @@ void processWiFiEvents()
   //   persistentState->Save();
   // }
 
-  // if (message == "#CONFIG_DONE")
-  // {
-  //   persistentState->Data.wifiConfigured = true;
-  //   persistentState->Data.resetState = false;
-  //   persistentState->Save();
-
-  //   stateIndex = 0;
-  // }
+  if (message == F("#CONFIG_DONE"))
+  {
+    resetMode = false;
+    displaySensorScreen();
+  }
 }
 
 // https://stackoverflow.com/questions/9072320/split-string-into-string-array
@@ -267,7 +275,7 @@ void setup()
   dht.begin();
   wifi.begin();
 
-  pinMode(INSTANT_BUTTON_PIN, INPUT);
+  pinMode(RESET_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
 
   wifi.isConnectedToNetwork();
@@ -275,30 +283,45 @@ void setup()
   displaySensorScreen();
 }
 
+void makeMeasurement()
+{
+  soilMoistureValue = analogRead(A0);
+  soilMoisturePercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
+  humidity = dht.readHumidity();
+  temperature = dht.readTemperature();
+
+  if (soilMoisturePercent >= 100)
+  {
+    soilMoisturePercent = 100;
+  }
+
+  if (soilMoisturePercent <= 0)
+  {
+    soilMoisturePercent = 0;
+  }
+}
+
 void loop()
 {
-  if (((millis() - startTime) > TEN_MINUTES) || instantBtnPrestate)
+  if (resetMode)
   {
-    instantBtnPrestate = false;
-    startTime = millis();
-    int soilMoistureValue = analogRead(A0);
-    soilmoisturepercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
-    hum = dht.readHumidity();
-    temp = dht.readTemperature();
-
-    if (soilmoisturepercent >= 100)
+    if (((millis() - lastConfigDisplayTime) > TWO_SECONDS))
     {
-      soilmoisturepercent = 100;
+      lastConfigDisplayTime = millis();
+      makeMeasurement();
+      displayConfigScreen();
     }
+  }
 
-    if (soilmoisturepercent <= 0)
-    {
-      soilmoisturepercent = 0;
-    }
+  if (((millis() - lastMeasurementTime) > TEN_MINUTES))
+  {
+    resetBtnPrestate = false;
+    lastMeasurementTime = millis();
+    makeMeasurement();
 
     if (connected)
     {
-      wifi.httpPostData(F("http://192.168.88.207:3000/insert"), "{\"sensor_id\":\"" + stationId + "\", \"temperature\": " + String(temp) + ", \"humidity\": " + String(hum) + ", \"soil_moisture\": " + String(soilmoisturepercent) + "}");
+      wifi.httpPostData(F("http://192.168.88.207:3000/insert"), "{\"sensor_id\":\"" + stationId + "\", \"temperature\": " + String(temperature) + ", \"humidity\": " + String(humidity) + ", \"soil_moisture\": " + String(soilMoisturePercent) + "}");
     }
     else
     {
