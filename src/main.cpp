@@ -22,12 +22,17 @@
 #include "SSD1306Ascii.h"
 #include "SSD1306AsciiAvrI2c.h"
 
+#include "EEPROMStore.h"
+#include "persistent_state.h"
+
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 //https://github.com/greiman/SSD1306Ascii
 SSD1306AsciiAvrI2c oled;
 
 SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
 Wifi wifi(aserial);
+
+EEPROMStore<PersistentState> persistentState;
 
 String stationId = "1";
 
@@ -51,6 +56,8 @@ bool screenBtnPrestate = false;
 
 String apIPAddress = "0.0.0.0";
 bool resetMode = false;
+unsigned int apCreationRetryCount = 0;
+unsigned const int maxRetryCount = 3;
 
 void displaySensorScreen()
 {
@@ -86,6 +93,21 @@ void displayLoadingScreen()
   oled.println(F("Loading..."));
 }
 
+void displayErrorScreen(const String &message)
+{
+  oled.clear();
+  oled.println(message);
+}
+
+void resetModule()
+{
+  resetBtnPrestate = true;
+  displayLoadingScreen();
+  persistentState.Reset();
+  persistentState.Save();
+  wifi.initConfigServer("PHCS-conf", "123456789");
+}
+
 bool checkButton(const int &pinNumber, const bool &prestate)
 {
   int btnState = digitalRead(pinNumber);
@@ -111,9 +133,7 @@ void handleButtons()
   {
     if (!resetBtnPrestate)
     {
-      resetBtnPrestate = true;
-      displayLoadingScreen();
-      wifi.initConfigServer("PHCS-conf", "123456789");
+      resetModule();
     }
   }
   else
@@ -153,6 +173,26 @@ void handleButtons()
   }
 }
 
+// https://stackoverflow.com/questions/9072320/split-string-into-string-array
+String getMessageElement(const String &data, char separator, int index)
+{
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length() - 1;
+
+  for (int i = 0; i <= maxIndex && found <= index; i++)
+  {
+    if (data.charAt(i) == separator || i == maxIndex)
+    {
+      found++;
+      strIndex[0] = strIndex[1] + 1;
+      strIndex[1] = (i == maxIndex) ? i + 1 : i;
+    }
+  }
+
+  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+}
+
 void processWiFiEvents()
 {
   String message = wifi.readDataFromWiFiModule();
@@ -168,30 +208,21 @@ void processWiFiEvents()
     transferStatusCode = "200";
   }
 
-  // if (message == "#MODULE_READY")
-  // {
-  // }
+  if (message == F("#AP_FAILED"))
+  {
+    if (apCreationRetryCount < maxRetryCount)
+    {
+      delay(2000);
+      apCreationRetryCount++;
+      resetModule();
+    }
+    else
+    {
+      displayErrorScreen(F("WiFi AP\nsetup failed :("));
+    }
+  }
 
-  // if (message == "#IDLE_STATE_READY")
-  // {
-  // }
-
-  // if (message == "#AP_FAILED")
-  // {
-  //   if (apCreationRetryCount < maxRetryCount)
-  //   {
-  //     delay(2000);
-  //     this->resetState();
-  //     apCreationRetryCount++;
-  //   }
-  //   else
-  //   {
-  //     apCreationRetryCount = 0;
-  //     stateIndex = 5;
-  //   }
-  // }
-
-  if (message.indexOf("#AP_READY") == 0)
+  if (message.indexOf(F("#AP_READY")) == 0)
   {
     apIPAddress = message.substring(message.indexOf('!') + 1, message.length());
     displayConfigScreen();
@@ -217,20 +248,20 @@ void processWiFiEvents()
     transferStatusCode = message.substring(message.indexOf('!') + 1, message.length());
   }
 
-  // if (message == "#CONFIG_FAILED")
-  // {
-  //   stateIndex = 6;
-  // }
+  if (message == F("#CONFIG_FAILED"))
+  {
+    displayErrorScreen(F("Configuration failed :("));
+  }
 
-  // if (message.indexOf("#CUSTOM_CFG") == 0)
-  // {
-  //   String airValue = getMessageElement(message, '!', 1);
-  //   String waterValue = getMessageElement(message, '!', 2);
+  if (message.indexOf(F("#CUSTOM_CFG")) == 0)
+  {
+    String airValue = getMessageElement(message, '!', 1);
+    String waterValue = getMessageElement(message, '!', 2);
 
-  //   persistentState->Data.airValue = atoi(airValue.c_str());
-  //   persistentState->Data.waterValue = atoi(waterValue.c_str());
-  //   persistentState->Save();
-  // }
+    persistentState.Data.airValue = atoi(airValue.c_str());
+    persistentState.Data.waterValue = atoi(waterValue.c_str());
+    persistentState.Save();
+  }
 
   if (message == F("#CONFIG_DONE"))
   {
@@ -238,26 +269,6 @@ void processWiFiEvents()
     displaySensorScreen();
   }
 }
-
-// https://stackoverflow.com/questions/9072320/split-string-into-string-array
-// String getMessageElement(String data, char separator, int index)
-// {
-//   int found = 0;
-//   int strIndex[] = {0, -1};
-//   int maxIndex = data.length() - 1;
-
-//   for (int i = 0; i <= maxIndex && found <= index; i++)
-//   {
-//     if (data.charAt(i) == separator || i == maxIndex)
-//     {
-//       found++;
-//       strIndex[0] = strIndex[1] + 1;
-//       strIndex[1] = (i == maxIndex) ? i + 1 : i;
-//     }
-//   }
-
-//   return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
-// }
 
 void displayBegin()
 {
@@ -274,6 +285,7 @@ void setup()
   displayBegin();
   dht.begin();
   wifi.begin();
+  persistentState.Load();
 
   pinMode(RESET_BUTTON_PIN, INPUT);
   pinMode(SCREEN_BUTTON_PIN, INPUT);
@@ -286,7 +298,7 @@ void setup()
 void makeMeasurement()
 {
   soilMoistureValue = analogRead(A0);
-  soilMoisturePercent = map(soilMoistureValue, AIR_VALUE, WATER_VALUE, 0, 100);
+  soilMoisturePercent = map(soilMoistureValue, persistentState.Data.airValue, persistentState.Data.waterValue, 0, 100);
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
 
