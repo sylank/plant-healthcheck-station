@@ -25,7 +25,7 @@
 #include "EEPROMStore.h"
 #include "persistent_state.h"
 
-#include <SimpleKalmanFilter.h>
+// #include <SimpleKalmanFilter.h>
 
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 //https://github.com/greiman/SSD1306Ascii
@@ -36,7 +36,7 @@ Wifi wifi(aserial);
 
 EEPROMStore<PersistentState> persistentState;
 
-SimpleKalmanFilter simpleKalmanFilter(2, 2, 0.01);
+// SimpleKalmanFilter simpleKalmanFilter(2, 2, 0.01);
 
 String stationId = "1";
 
@@ -49,6 +49,8 @@ bool pkgStatus = false;
 String transferStatusCode = "0";
 bool connected = false;
 String ipAddress = "0.0.0.0";
+
+bool screenOff = false;
 
 int soilMoistureValue = 0;
 int soilMoisturePercent = 0;
@@ -106,6 +108,7 @@ void displayErrorScreen(const String &message)
 void resetModule()
 {
   resetBtnPrestate = true;
+  connected = false;
   displayLoadingScreen();
   persistentState.Reset();
   persistentState.Save();
@@ -150,6 +153,7 @@ void handleButtons()
     if (!screenBtnPrestate)
     {
       screenBtnPrestate = true;
+      screenOff = false;
       screenStatus++;
 
       if (screenStatus > 2)
@@ -167,6 +171,7 @@ void handleButtons()
         break;
       case 2: // OFF
         oled.clear();
+        screenOff = true;
         break;
       }
     }
@@ -278,8 +283,9 @@ void displayBegin()
 {
   oled.begin(&Adafruit128x64, DISPLAY_ADDRESS);
   oled.setFont(X11fixed7x14);
-  oled.clear();
   oled.setI2cClock(900000L);
+  oled.clear();
+  displayLoadingScreen();
 }
 
 void setup()
@@ -302,7 +308,7 @@ void setup()
 void makeMeasurement()
 {
   soilMoistureValue = analogRead(A0);
-  soilMoistureValue = simpleKalmanFilter.updateEstimate(soilMoistureValue);
+  //soilMoistureValue = simpleKalmanFilter.updateEstimate(soilMoistureValue);
   soilMoisturePercent = map(soilMoistureValue, persistentState.Data.airValue, persistentState.Data.waterValue, 0, 100);
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
@@ -320,21 +326,20 @@ void makeMeasurement()
 
 void loop()
 {
+  makeMeasurement();
+
   if (resetMode)
   {
     if (((millis() - lastConfigDisplayTime) > TWO_SECONDS))
     {
       lastConfigDisplayTime = millis();
-      makeMeasurement();
       displayConfigScreen();
     }
   }
 
   if (((millis() - lastMeasurementTime) > TEN_MINUTES))
   {
-    resetBtnPrestate = false;
     lastMeasurementTime = millis();
-    makeMeasurement();
 
     if (connected)
     {
@@ -345,7 +350,11 @@ void loop()
       wifi.connectToStoredNetwork();
     }
 
-    displaySensorScreen();
+    if (!screenOff)
+    {
+      displaySensorScreen();
+    }
+
     wifi.isConnectedToNetwork();
   }
 
