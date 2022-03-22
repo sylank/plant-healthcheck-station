@@ -25,7 +25,7 @@
 #include "EEPROMStore.h"
 #include "persistent_state.h"
 
-// #include <SimpleKalmanFilter.h>
+#include "Filter.h"
 
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 //https://github.com/greiman/SSD1306Ascii
@@ -36,7 +36,7 @@ Wifi wifi(aserial);
 
 EEPROMStore<PersistentState> persistentState;
 
-// SimpleKalmanFilter simpleKalmanFilter(2, 2, 0.01);
+ExponentialFilter<long> ADCFilter(5, 0);
 
 String stationId = "1";
 
@@ -44,6 +44,7 @@ int screenStatus = 0;
 
 unsigned long lastMeasurementTime = millis();
 unsigned long lastConfigDisplayTime = millis();
+unsigned long lastSensorReadTime = millis();
 
 bool pkgStatus = false;
 String transferStatusCode = "0";
@@ -113,22 +114,6 @@ void resetModule()
   persistentState.Reset();
   persistentState.Save();
   wifi.initConfigServer("PHCS-conf", "123456789");
-}
-
-bool checkButton(const int &pinNumber, const bool &prestate)
-{
-  int btnState = digitalRead(pinNumber);
-
-  if (btnState == HIGH && prestate == false)
-  {
-    return true;
-  }
-  else if (btnState == LOW)
-  {
-    return false;
-  }
-
-  return false;
 }
 
 void handleButtons()
@@ -308,7 +293,8 @@ void setup()
 void makeMeasurement()
 {
   soilMoistureValue = analogRead(A0);
-  //soilMoistureValue = simpleKalmanFilter.updateEstimate(soilMoistureValue);
+  ADCFilter.Filter(soilMoistureValue);
+  soilMoistureValue = ADCFilter.Current();
   soilMoisturePercent = map(soilMoistureValue, persistentState.Data.airValue, persistentState.Data.waterValue, 0, 100);
   humidity = dht.readHumidity();
   temperature = dht.readTemperature();
@@ -326,7 +312,10 @@ void makeMeasurement()
 
 void loop()
 {
-  makeMeasurement();
+  if (((millis() - lastSensorReadTime) > TWO_SECONDS))
+  {
+    makeMeasurement();
+  }
 
   if (resetMode)
   {
@@ -337,7 +326,7 @@ void loop()
     }
   }
 
-  if (((millis() - lastMeasurementTime) > TEN_MINUTES))
+  if (((millis() - lastMeasurementTime) > TEN_MINUTES) && !resetMode)
   {
     lastMeasurementTime = millis();
 
