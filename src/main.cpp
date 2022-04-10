@@ -28,7 +28,7 @@
 #include "Filter.h"
 
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
-//https://github.com/greiman/SSD1306Ascii
+// https://github.com/greiman/SSD1306Ascii
 SSD1306AsciiAvrI2c oled;
 
 SoftwareSerial aserial(SOFT_S_RX, SOFT_S_TX); // RX | TX
@@ -60,11 +60,13 @@ float temperature = 0;
 
 bool resetBtnPrestate = false;
 bool screenBtnPrestate = false;
+bool instantBtnPrestate = false;
 
 String apIPAddress = "0.0.0.0";
 bool resetMode = false;
 unsigned int apCreationRetryCount = 0;
 unsigned const int maxRetryCount = 3;
+bool instant = false;
 
 void displaySensorScreen()
 {
@@ -120,6 +122,7 @@ void handleButtons()
 {
   int resetValue = digitalRead(RESET_BUTTON_PIN);
   int screenValue = digitalRead(SCREEN_BUTTON_PIN);
+  int instantValue = digitalRead(INSTANT_BUTTON_PIN);
 
   if (resetValue == HIGH)
   {
@@ -164,6 +167,18 @@ void handleButtons()
   else
   {
     screenBtnPrestate = false;
+  }
+
+  if (instantValue == HIGH)
+  {
+    if (!instantBtnPrestate)
+    {
+      instant = true;
+    }
+  }
+  else
+  {
+    instantBtnPrestate = false;
   }
 }
 
@@ -278,6 +293,9 @@ void setup()
   Serial.begin(9600);
 
   displayBegin();
+
+  delay(2000);
+
   dht.begin();
   wifi.begin();
   persistentState.Load();
@@ -326,8 +344,9 @@ void loop()
     }
   }
 
-  if (((millis() - lastMeasurementTime) > TEN_MINUTES) && !resetMode)
+  if (instant || (((millis() - lastMeasurementTime) > TEN_MINUTES) && !resetMode))
   {
+    instant = false;
     lastMeasurementTime = millis();
 
     if (connected)
