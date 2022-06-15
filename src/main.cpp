@@ -2,45 +2,89 @@
 
 #include <SoftwareSerial.h>
 
+// https://github.com/RobTillaart/Arduino/blob/master/libraries/DHTlib/examples/dht22_test/dht22_test.ino
+#include <dht.h>
+
+#define DHT_PIN PIN_B2
+#define DHTTYPE DHT22 // DHT 22  (AM2302)
+
 #define RX PIN_B0
 #define TX PIN_B1
+#define SOIL_MOISTURE_PIN A7
 
-SoftwareSerial mySerial(RX, TX);
-int i = 0;
-char buf[12];
+#define RESET_BUTTON_PIN PIN_A3
+
+const byte COLOR_BLACK = 0b000;
+const byte COLOR_RED = 0b100;
+const byte COLOR_GREEN = 0b010;
+const byte COLOR_BLUE = 0b001;
+const byte COLOR_MAGENTA = 0b101;
+const byte COLOR_CYAN = 0b011;
+const byte COLOR_YELLOW = 0b110;
+const byte COLOR_WHITE = 0b111;
+
+const byte PIN_LED_R = PIN_A0;
+const byte PIN_LED_G = PIN_A1;
+const byte PIN_LED_B = PIN_A2;
+
+const byte PIN_WIFI_STATUS = PIN_A4;
+
+SoftwareSerial serial(RX, TX);
+
+dht DHT;
+
+bool resetBtnPrestate = false;
+
+void displayColor(byte color)
+{
+  digitalWrite(PIN_LED_R, !bitRead(color, 2));
+  digitalWrite(PIN_LED_G, !bitRead(color, 1));
+  digitalWrite(PIN_LED_B, !bitRead(color, 0));
+}
 
 void setup()
 {
+  pinMode(PIN_LED_R, OUTPUT);
+  pinMode(PIN_LED_G, OUTPUT);
+  pinMode(PIN_LED_B, OUTPUT);
+
+  pinMode(PIN_WIFI_STATUS, OUTPUT);
+
+  displayColor(COLOR_BLACK);
+
+  digitalWrite(PIN_WIFI_STATUS, HIGH);
+
   pinMode(RX, INPUT);
   pinMode(TX, OUTPUT);
-  mySerial.begin(19200);
+
+  pinMode(RESET_BUTTON_PIN, INPUT);
+
+  serial.begin(19200);
 }
 
 void loop()
 {
-  // if (mySerial.available()>0){
-  // buf[i]= mySerial.read();
-  // if (int(buf[i])==13 || int(buf[i])==10 ){ //If Carriage return has been reached
-  // mySerial.println(buf);
-  // for(int x=0;x<=10;x++){
-  // buf[x]=' ';
-  // }
-  // i=0; //start over again
-  //
-  // } //if enter
-  // i++;
-  // } //If mySerial.available
+  int soilMoistureValue = analogRead(SOIL_MOISTURE_PIN);
+  int soilMoisturePercent = map(soilMoistureValue, 850, 450, 0, 100);
 
-  if (mySerial.available() > 0)
+  DHT.read22(DHT_PIN);
+  float humidity = DHT.humidity;
+  float temperature = DHT.temperature;
+
+  displayColor(COLOR_WHITE);
+
+  int resetValue = digitalRead(RESET_BUTTON_PIN);
+
+  if (resetValue == HIGH)
   {
-    String data = "";
-
-    while (mySerial.available())
+    if (!resetBtnPrestate)
     {
-      int incomingByte = mySerial.read();
-      data += (char)incomingByte;
+      resetBtnPrestate = true;
+      serial.println("r");
     }
-
-    mySerial.println(data);
   }
-} // LOOP
+  else
+  {
+    resetBtnPrestate = false;
+  }
+}
