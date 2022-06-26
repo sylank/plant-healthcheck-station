@@ -21,10 +21,10 @@
 
 #define TWENTY_SECS 20000
 
-const byte COLOR_RED = 0b100;
-const byte COLOR_YELLOW = 0b110;
-const byte COLOR_GREEN = 0b010;
-const byte COLOR_WHITE = 0b111;
+#define COLOR_RED 0b100
+#define COLOR_YELLOW 0b110
+#define COLOR_GREEN 0b010
+#define COLOR_WHITE 0b111
 
 unsigned long lastSensorReadTime = millis();
 
@@ -73,7 +73,7 @@ byte determineSoilMoistureColor(const unsigned int &percent)
   return COLOR_WHITE;
 }
 
-void sendCalculatedDataOnSerial(const unsigned int &soilMoisturePercent, const float &hum, const float &temp)
+void sendDataOnSerial(const unsigned int &soilMoisturePercent, const float &hum, const float &temp)
 {
   wifi.sendDataOnSerial(soilMoisturePercent, hum, temp);
 }
@@ -155,11 +155,11 @@ void loop()
 
     if (persistentState.Data.calculatedSend)
     {
-      sendCalculatedDataOnSerial(soilMoisturePercent, DHT.humidity, DHT.temperature);
+      sendDataOnSerial(soilMoisturePercent, DHT.humidity, DHT.temperature);
     }
     else
     {
-      sendCalculatedDataOnSerial(soilMoistureValue, DHT.humidity, DHT.temperature);
+      sendDataOnSerial(soilMoistureValue, DHT.humidity, DHT.temperature);
     }
   }
 
