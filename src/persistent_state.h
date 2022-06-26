@@ -2,6 +2,7 @@ struct PersistentState
 {
     unsigned airValue;
     unsigned waterValue;
+    bool calculatedSend;
 
     void Reset()
     {
@@ -9,5 +10,6 @@ struct PersistentState
         // stored in the eeprom yet.
         airValue = 615;
         waterValue = 249;
+        calculatedSend = true;
     }
 };
