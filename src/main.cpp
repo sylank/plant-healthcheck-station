@@ -149,34 +149,36 @@ void loop()
     sensorsTurnOn();
 
     unsigned int soilMoistureValue = analogRead(SOIL_MOISTURE_PIN);
-    unsigned int soilMoisturePercent = map(soilMoistureValue,
-                                           persistentState.Data.airValue,
-                                           persistentState.Data.waterValue,
-                                           0,
-                                           100);
-
-    if (soilMoisturePercent < 0)
-    {
-      soilMoisturePercent = 0;
-    }
-
-    if (soilMoisturePercent > 100)
-    {
-      soilMoisturePercent = 100;
-    }
 
     DHT.read22(DHT_PIN);
 
     sensorsTurnOff();
 
-    soilMoistureColor = determineSoilMoistureColor(soilMoisturePercent);
-
     if (persistentState.Data.calculatedSend)
     {
+      unsigned int soilMoisturePercent = map(soilMoistureValue,
+                                             persistentState.Data.airValue,
+                                             persistentState.Data.waterValue,
+                                             0,
+                                             100);
+
+      if (soilMoisturePercent < 0)
+      {
+        soilMoisturePercent = 0;
+      }
+
+      if (soilMoisturePercent > 100)
+      {
+        soilMoisturePercent = 100;
+      }
+
+      soilMoistureColor = determineSoilMoistureColor(soilMoisturePercent);
+
       sendDataOnSerial(soilMoisturePercent, DHT.humidity, DHT.temperature);
     }
     else
     {
+      soilMoistureColor = COLOR_WHITE;
       sendDataOnSerial(soilMoistureValue, DHT.humidity, DHT.temperature);
     }
   }
