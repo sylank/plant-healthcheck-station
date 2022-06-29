@@ -46,6 +46,8 @@ void displayColor(const byte &color)
 void sensorsTurnOn()
 {
   digitalWrite(SENSOR_ACTIVATE_PIN, HIGH);
+
+  delay(1000);
 }
 
 void sensorsTurnOff()
@@ -102,16 +104,21 @@ void processIncommingWiFiData()
 {
   String message = wifi.readDataFromWiFiModule();
 
+  // #1!0!0!1 --> calculated
+  // #1!0!0!0 --> raw
   if (message.indexOf("#1") == 0)
   {
     String airValue = getMessageElement(message, '!', 1);
     String waterValue = getMessageElement(message, '!', 2);
     String modeValue = getMessageElement(message, '!', 3);
 
-    persistentState.Data.airValue = atoi(airValue.c_str());
-    persistentState.Data.waterValue = atoi(waterValue.c_str());
     persistentState.Data.calculatedSend = modeValue == "1";
-    persistentState.Save();
+    if (persistentState.Data.calculatedSend)
+    {
+      persistentState.Data.airValue = atoi(airValue.c_str());
+      persistentState.Data.waterValue = atoi(waterValue.c_str());
+      persistentState.Save();
+    }
   }
 }
 
@@ -136,8 +143,9 @@ void setup()
 
 void loop()
 {
-  if ((millis() - lastSensorReadTime) > TWENTY_SECS)
+  if (((millis() - lastSensorReadTime) > TWENTY_SECS) || !persistentState.Data.calculatedSend)
   {
+    lastSensorReadTime = millis();
     sensorsTurnOn();
 
     unsigned int soilMoistureValue = analogRead(SOIL_MOISTURE_PIN);
@@ -146,6 +154,16 @@ void loop()
                                            persistentState.Data.waterValue,
                                            0,
                                            100);
+
+    if (soilMoisturePercent < 0)
+    {
+      soilMoisturePercent = 0;
+    }
+
+    if (soilMoisturePercent > 100)
+    {
+      soilMoisturePercent = 100;
+    }
 
     DHT.read22(DHT_PIN);
 

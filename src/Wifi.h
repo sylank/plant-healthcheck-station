@@ -12,7 +12,6 @@ private:
 
 public:
     Wifi(SoftwareSerial &serial);
-    void begin();
 
     void sendDataOnSerial(const unsigned int &soilMoisture, const float &hum, const float &temp);
     String readDataFromWiFiModule();
@@ -24,15 +23,11 @@ Wifi::Wifi(SoftwareSerial &aserial) : serial(aserial)
 {
 }
 
-void Wifi::begin()
-{
-    serial.begin(9600);
-}
-
 void Wifi::sendDataOnSerial(const unsigned int &soilMoisture, const float &hum, const float &temp)
 {
     char buff[15];
-    serial.println(sprintf(buff, "#%s;%s;%s", soilMoisture, hum, temp));
+    sprintf(buff, "#%d;%d;%d", soilMoisture, (unsigned)hum, (unsigned)temp);
+    serial.println(buff);
 }
 
 String Wifi::readDataFromWiFiModule()
