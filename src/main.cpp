@@ -117,8 +117,9 @@ void processIncommingWiFiData()
     {
       persistentState.Data.airValue = atoi(airValue.c_str());
       persistentState.Data.waterValue = atoi(waterValue.c_str());
-      persistentState.Save();
     }
+
+    persistentState.Save();
   }
 }
 
