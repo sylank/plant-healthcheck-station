@@ -12,15 +12,8 @@ private:
 
 public:
     Wifi(SoftwareSerial &serial);
-    void begin();
 
-    void initConfigServer(const String &ssid, const String &password);
-    void connectToStoredNetwork();
-    void httpPostData(const String &serverURL, const String &jsonStr);
-    void idleMode();
-
-    void isConnectedToNetwork();
-
+    void sendDataOnSerial(const unsigned int &soilMoisture, const float &hum, const float &temp);
     String readDataFromWiFiModule();
 
     ~Wifi();
@@ -30,34 +23,11 @@ Wifi::Wifi(SoftwareSerial &aserial) : serial(aserial)
 {
 }
 
-void Wifi::begin()
+void Wifi::sendDataOnSerial(const unsigned int &soilMoisture, const float &hum, const float &temp)
 {
-    serial.begin(9600);
-}
-
-void Wifi::initConfigServer(const String &ssid, const String &password)
-{
-    serial.println("0#" + ssid + "!" + password);
-}
-
-void Wifi::connectToStoredNetwork()
-{
-    serial.println("1");
-}
-
-void Wifi::httpPostData(const String &serverURL, const String &jsonStr)
-{
-    serial.println("2#" + serverURL + "!" + jsonStr);
-}
-
-void Wifi::idleMode()
-{
-    serial.println(F("9"));
-}
-
-void Wifi::isConnectedToNetwork()
-{
-    serial.println(F("3"));
+    char buff[15];
+    sprintf(buff, "#%d;%d;%d", soilMoisture, (unsigned)hum, (unsigned)temp);
+    serial.println(buff);
 }
 
 String Wifi::readDataFromWiFiModule()
@@ -74,7 +44,6 @@ String Wifi::readDataFromWiFiModule()
             if (serial.available())
             {
                 charIn = serial.read();
-                // Serial.println(charIn);
                 responseBuffer += charIn;
             }
             if (responseBuffer.endsWith("\n"))
