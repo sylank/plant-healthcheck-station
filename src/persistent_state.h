@@ -10,6 +10,5 @@ struct PersistentState
         // stored in the eeprom yet.
         airValue = 615;
         waterValue = 249;
-        calculatedSend = true;
     }
 };

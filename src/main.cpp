@@ -19,7 +19,7 @@
 
 #define SENSOR_ACTIVATE_PIN PIN_A6
 
-#define TWENTY_SECS 20000
+#define TEN_MINUTES 600000
 
 #define COLOR_RED 0b100
 #define COLOR_YELLOW 0b110
@@ -35,6 +35,7 @@ dht DHT;
 EEPROMStore<PersistentState> persistentState;
 
 byte soilMoistureColor = COLOR_WHITE;
+bool calculatedSend = true;
 
 void displayColor(const byte &color)
 {
@@ -112,8 +113,8 @@ void processIncommingWiFiData()
     String waterValue = getMessageElement(message, '!', 2);
     String modeValue = getMessageElement(message, '!', 3);
 
-    persistentState.Data.calculatedSend = modeValue == "1";
-    if (persistentState.Data.calculatedSend)
+    calculatedSend = modeValue == "1";
+    if (calculatedSend)
     {
       persistentState.Data.airValue = atoi(airValue.c_str());
       persistentState.Data.waterValue = atoi(waterValue.c_str());
@@ -144,7 +145,7 @@ void setup()
 
 void loop()
 {
-  if (((millis() - lastSensorReadTime) > TWENTY_SECS) || !persistentState.Data.calculatedSend)
+  if (((millis() - lastSensorReadTime) > TEN_MINUTES) || !calculatedSend)
   {
     lastSensorReadTime = millis();
     sensorsTurnOn();
@@ -155,7 +156,7 @@ void loop()
 
     sensorsTurnOff();
 
-    if (persistentState.Data.calculatedSend)
+    if (calculatedSend)
     {
       unsigned int soilMoisturePercent = map(soilMoistureValue,
                                              persistentState.Data.airValue,
