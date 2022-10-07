@@ -19,7 +19,7 @@
 
 #define SENSOR_ACTIVATE_PIN PIN_A6
 
-#define TEN_MINUTES 600000
+#define FIVE_MINUTES 300000
 
 #define COLOR_RED 0b100
 #define COLOR_YELLOW 0b110
@@ -145,7 +145,7 @@ void setup()
 
 void loop()
 {
-  if (((millis() - lastSensorReadTime) > TEN_MINUTES) || !calculatedSend)
+  if (((millis() - lastSensorReadTime) > FIVE_MINUTES) || !calculatedSend)
   {
     lastSensorReadTime = millis();
     sensorsTurnOn();
