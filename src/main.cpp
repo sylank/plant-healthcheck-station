@@ -13,18 +13,9 @@
 #define RX PIN_B0
 #define TX PIN_B1
 
-#define PIN_LED_R PIN_A0
-#define PIN_LED_G PIN_A1
-#define PIN_LED_B PIN_A2
-
 #define SENSOR_ACTIVATE_PIN PIN_A6
 
 #define FIVE_MINUTES 300000
-
-#define COLOR_RED 0b100
-#define COLOR_YELLOW 0b110
-#define COLOR_GREEN 0b010
-#define COLOR_WHITE 0b111
 
 unsigned long lastSensorReadTime = millis();
 
@@ -34,15 +25,7 @@ dht DHT;
 
 EEPROMStore<PersistentState> persistentState;
 
-byte soilMoistureColor = COLOR_WHITE;
 bool calculatedSend = true;
-
-void displayColor(const byte &color)
-{
-  digitalWrite(PIN_LED_R, !bitRead(color, 2));
-  digitalWrite(PIN_LED_G, !bitRead(color, 1));
-  digitalWrite(PIN_LED_B, !bitRead(color, 0));
-}
 
 void sensorsTurnOn()
 {
@@ -54,26 +37,6 @@ void sensorsTurnOn()
 void sensorsTurnOff()
 {
   digitalWrite(SENSOR_ACTIVATE_PIN, LOW);
-}
-
-byte determineSoilMoistureColor(const unsigned int &percent)
-{
-  if (percent < 30)
-  {
-    return COLOR_RED;
-  }
-
-  if (percent >= 30 && percent < 60)
-  {
-    return COLOR_YELLOW;
-  }
-
-  if (percent >= 60)
-  {
-    return COLOR_GREEN;
-  }
-
-  return COLOR_WHITE;
 }
 
 void sendDataOnSerial(const unsigned int &soilMoisturePercent, const float &hum, const float &temp)
@@ -126,12 +89,6 @@ void processIncommingWiFiData()
 
 void setup()
 {
-  pinMode(PIN_LED_R, OUTPUT);
-  pinMode(PIN_LED_G, OUTPUT);
-  pinMode(PIN_LED_B, OUTPUT);
-
-  displayColor(COLOR_WHITE);
-
   pinMode(RX, INPUT);
   pinMode(TX, OUTPUT);
 
@@ -174,17 +131,13 @@ void loop()
         soilMoisturePercent = 100;
       }
 
-      soilMoistureColor = determineSoilMoistureColor(soilMoisturePercent);
-
       sendDataOnSerial(soilMoisturePercent, DHT.humidity, DHT.temperature);
     }
     else
     {
-      soilMoistureColor = COLOR_WHITE;
       sendDataOnSerial(soilMoistureValue, DHT.humidity, DHT.temperature);
     }
   }
 
-  displayColor(soilMoistureColor);
   processIncommingWiFiData();
 }
